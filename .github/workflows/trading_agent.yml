@@ -52,7 +52,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      reviews: write
     steps:
       - name: Execute Review Agent
         run: gh agent run .github/workflows/review_agent.md

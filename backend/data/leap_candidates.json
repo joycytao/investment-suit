@@ -1,0 +1,184 @@
+{
+  "status": "success",
+  "timestamp": "2026-05-01T08:47:16.312717",
+  "scan_date": "2026-05-01",
+  "candidates": [
+    {
+      "ticker": "MSFT",
+      "revenue_growth": 0.183,
+      "profit_margin": 0.39341998,
+      "current_price": 414.995,
+      "target_price": 570.7213,
+      "iv_rank": null,
+      "upside_potential": 0.37524861745322236,
+      "leap_sweet_spots": [
+        {
+          "strike": 350.0,
+          "lastPrice": 108.5,
+          "delta": 0.8346,
+          "theta": -0.0586,
+          "theta_delta_ratio": 0.07021327582075246,
+          "openInterest": 1873,
+          "bid": 0.0,
+          "ask": 0.0,
+          "expiration_date": "2028-01-21",
+          "dte": 630
+        },
+        {
+          "strike": 350.0,
+          "lastPrice": 106.55,
+          "delta": 0.8355,
+          "theta": -0.0596,
+          "theta_delta_ratio": 0.07133453022142429,
+          "openInterest": 830,
+          "bid": 0.0,
+          "ask": 0.0,
+          "expiration_date": "2027-12-17",
+          "dte": 595
+        },
+        {
+          "strike": 350.0,
+          "lastPrice": 93.73,
+          "delta": 0.8457,
+          "theta": -0.0657,
+          "theta_delta_ratio": 0.0776871230932955,
+          "openInterest": 1401,
+          "bid": 0.0,
+          "ask": 0.0,
+          "expiration_date": "2027-06-17",
+          "dte": 412
+        }
+      ]
+    },
+    {
+      "ticker": "NVDA",
+      "revenue_growth": 0.732,
+      "profit_margin": 0.55603004,
+      "current_price": 200.5701,
+      "target_price": 269.16544,
+      "iv_rank": null,
+      "upside_potential": 0.34200182380125455,
+      "leap_sweet_spots": [
+        {
+          "strike": 170.0,
+          "lastPrice": 66.5,
+          "delta": 0.8312,
+          "theta": -0.0285,
+          "theta_delta_ratio": 0.034287776708373435,
+          "openInterest": 6049,
+          "bid": 0.0,
+          "ask": 0.0,
+          "expiration_date": "2028-01-21",
+          "dte": 630
+        },
+        {
+          "strike": 170.0,
+          "lastPrice": 65.55,
+          "delta": 0.832,
+          "theta": -0.029,
+          "theta_delta_ratio": 0.03485576923076923,
+          "openInterest": 4371,
+          "bid": 0.0,
+          "ask": 0.0,
+          "expiration_date": "2027-12-17",
+          "dte": 595
+        },
+        {
+          "strike": 170.0,
+          "lastPrice": 62.35,
+          "delta": 0.8354,
+          "theta": -0.0304,
+          "theta_delta_ratio": 0.03638975341153938,
+          "openInterest": 366,
+          "bid": 0.0,
+          "ask": 0.0,
+          "expiration_date": "2027-09-17",
+          "dte": 504
+        },
+        {
+          "strike": 170.0,
+          "lastPrice": 57.2,
+          "delta": 0.8416,
+          "theta": -0.032,
+          "theta_delta_ratio": 0.03802281368821293,
+          "openInterest": 4990,
+          "bid": 0.0,
+          "ask": 0.0,
+          "expiration_date": "2027-06-17",
+          "dte": 412
+        }
+      ]
+    },
+    {
+      "ticker": "META",
+      "revenue_growth": 0.331,
+      "profit_margin": 0.32837,
+      "current_price": 610.53,
+      "target_price": 855.1127,
+      "iv_rank": null,
+      "upside_potential": 0.40060717737048157,
+      "leap_sweet_spots": [
+        {
+          "strike": 510.0,
+          "lastPrice": 195.17,
+          "delta": 0.8421,
+          "theta": -0.0852,
+          "theta_delta_ratio": 0.10117563234770217,
+          "openInterest": 93,
+          "bid": 0.0,
+          "ask": 0.0,
+          "expiration_date": "2028-01-21",
+          "dte": 630
+        },
+        {
+          "strike": 510.0,
+          "lastPrice": 180.0,
+          "delta": 0.8432,
+          "theta": -0.0866,
+          "theta_delta_ratio": 0.10270398481973435,
+          "openInterest": 167,
+          "bid": 0.0,
+          "ask": 0.0,
+          "expiration_date": "2027-12-17",
+          "dte": 595
+        },
+        {
+          "strike": 520.0,
+          "lastPrice": 156.95,
+          "delta": 0.8364,
+          "theta": -0.0982,
+          "theta_delta_ratio": 0.1174079387852702,
+          "openInterest": 134,
+          "bid": 0.0,
+          "ask": 0.0,
+          "expiration_date": "2027-06-17",
+          "dte": 412
+        }
+      ]
+    },
+    {
+      "ticker": "INTU",
+      "revenue_growth": 0.174,
+      "profit_margin": 0.2157,
+      "current_price": 400.755,
+      "target_price": 594.1097,
+      "iv_rank": null,
+      "upside_potential": 0.48247607640578405,
+      "leap_sweet_spots": [
+        {
+          "strike": 360.0,
+          "lastPrice": 122.5,
+          "delta": 0.7798,
+          "theta": -0.0603,
+          "theta_delta_ratio": 0.0773275198768915,
+          "openInterest": 107,
+          "bid": 0.0,
+          "ask": 0.0,
+          "expiration_date": "2028-01-21",
+          "dte": 630
+        }
+      ]
+    }
+  ],
+  "count": 4
+}

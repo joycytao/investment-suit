@@ -42,6 +42,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write
     steps:
       - name: Invoke Repair Agent on Failure
         env:
@@ -54,6 +55,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write
     steps:
       - name: Execute Review Agent
         env:

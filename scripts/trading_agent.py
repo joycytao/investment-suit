@@ -11,7 +11,6 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 
-# --- 1. 從 GitHub Secrets 讀取環境變數 ---
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 ALPACA_KEY = os.getenv("ALPACA_API_KEY")
 ALPACA_SECRET = os.getenv("ALPACA_SECRET_KEY")

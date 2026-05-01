@@ -1,4 +1,4 @@
-name: Alpaca Sniper Bot
+name: Alpaca Bot
 
 on:
   schedule:
@@ -25,7 +25,7 @@ jobs:
 
       - name: Run Sniper Agent
         env:
-          # 將 GitHub Secrets 注入到 Python 環境變數中
+          # Inject GitHub Secrets into Python environment variables
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}

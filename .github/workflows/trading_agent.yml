@@ -30,4 +30,4 @@ jobs:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
-        run: python your_script_name.py
+        run: python -m backend.main

@@ -44,6 +44,8 @@ jobs:
       pull-requests: write
     steps:
       - name: Invoke Repair Agent on Failure
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh agent run .github/workflows/repair_agent.md
 
   auto-review-and-merge:
@@ -54,6 +56,8 @@ jobs:
       pull-requests: write
     steps:
       - name: Execute Review Agent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh agent run .github/workflows/review_agent.md
       
       - name: Finalize Merge

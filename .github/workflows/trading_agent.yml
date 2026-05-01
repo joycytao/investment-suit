@@ -60,7 +60,10 @@ jobs:
       - name: Execute Review Agent
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh agent run .github/workflows/review_agent.md
+        run: 
+          # Explicitly tell gh to use the token for this session
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh agent run .github/workflows/review_agent.md
       
       - name: Finalize Merge
         if: contains(github.event.comment.body, '/approve-and-merge')

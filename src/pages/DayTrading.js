@@ -58,9 +58,13 @@ const DayTrading = () => {
     setScanning(true);
     setMessage({ type: 'info', text: 'Scanning for High Demand Low Supply stocks with positive news sentiment...' });
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min timeout
+
     try {
       const response = await fetch(`${backendUrl}/api/day-trading-scan`, {
         method: 'POST',
+        signal: controller.signal
       });
 
       const data = await response.json();
@@ -74,8 +78,13 @@ const DayTrading = () => {
       }
     } catch (error) {
       console.error('Scan error:', error);
-      setMessage({ type: 'error', text: 'Failed to scan. Backend may be unavailable.' });
+      if (error.name === 'AbortError') {
+        setMessage({ type: 'error', text: 'Scan timeout after 2 minutes. Backend may be overloaded.' });
+      } else {
+        setMessage({ type: 'error', text: 'Failed to scan. Backend may be unavailable.' });
+      }
     } finally {
+      clearTimeout(timeoutId);
       setScanning(false);
     }
   };

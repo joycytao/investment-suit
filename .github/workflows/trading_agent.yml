@@ -1,0 +1,32 @@
+name: Alpaca Sniper Bot
+
+on:
+  schedule:
+    # Using Cron syntax here. US Eastern Time 09:30 AM = UTC 13:30 (Daylight Saving Time)
+    # Recommended to set at 13:31 UTC, run Monday through Friday
+    - cron: '31 13 * * 1-5'
+  workflow_dispatch: # Allow manual trigger from GitHub Actions UI
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install alpaca-py pandas_ta requests
+
+      - name: Run Sniper Agent
+        env:
+          # 將 GitHub Secrets 注入到 Python 環境變數中
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        run: python your_script_name.py

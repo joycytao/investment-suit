@@ -10,6 +10,15 @@ load_dotenv()
 ALPHAVANTAGE_API_KEY = os.getenv("ALPHAVANTAGE_API_KEY", "demo")
 ALPHAVANTAGE_BASE_URL = "https://www.alphavantage.co/query"
 
+# Gemini API (for Day Trading news sentiment analysis)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Log warning if optional API key is missing
+import logging
+_logger = logging.getLogger(__name__)
+if not GEMINI_API_KEY:
+    _logger.warning("GEMINI_API_KEY not configured—sentiment analysis will default to Neutral")
+
 # Trading Configuration
 SYMBOLS = ["QQQ", "SPY", "DIA"]
 INTERVAL = "daily"

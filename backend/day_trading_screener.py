@@ -113,17 +113,19 @@ def analyze_news_sentiment(ticker, headlines, news_items):
     """
     Use Gemini API to analyze sentiment of news headlines.
     Returns sentiment classification and confidence.
+    Defaults to Neutral if no headlines or API unavailable.
     """
     if not headlines:
-        return "No news", 0
+        return "Neutral", 0
     
     try:
-        api_key = os.getenv('GEMINI_API_KEY')
-        if not api_key:
+        from backend.config import GEMINI_API_KEY
+        
+        if not GEMINI_API_KEY:
             logger.warning("GEMINI_API_KEY not set, skipping sentiment analysis")
             return "Unknown", 0
         
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=GEMINI_API_KEY)
         
         # Create prompt for sentiment analysis
         news_text = "\n".join(headlines[:3])  # Use top 3 headlines
@@ -169,7 +171,7 @@ Example: Positive 85"""
     
     except Exception as e:
         logger.error(f"Error analyzing sentiment for {ticker}: {str(e)}")
-        return "Error", 0
+        return "Neutral", 0
 
 
 def get_relative_volume(ticker):

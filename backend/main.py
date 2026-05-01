@@ -347,11 +347,11 @@ def trigger_day_trading_scan():
     """Manually trigger day trading candidate scan.
     
     Screens for:
-    - Price: $3-$20
+    - Price: $1-$20
     - Float: < 5M shares
     - Relative Volume: > 5x
     - Change: Up
-    - With positive news sentiment
+    - Excluding negative news sentiment (includes Positive, Neutral, or None)
     """
     try:
         from backend.day_trading_screener import scan_day_trading_candidates

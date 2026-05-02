@@ -33,7 +33,7 @@ jobs:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
-        run: python trading_agent.py
+        run: python scripts/trading_agent.py
   
   diagnose-failure: 
     runs-on: ubuntu-latest
@@ -47,7 +47,7 @@ jobs:
       - name: Invoke Repair Agent on Failure
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh agent run .github/workflows/repair_agent.md
+        run: gh agent run .github/workflows/repair_agent.yml
 
   auto-review-and-merge:
     if: contains(github.event.comment.body, '/request-audit')
@@ -63,7 +63,7 @@ jobs:
         run: 
           # Explicitly tell gh to use the token for this session
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          gh agent run .github/workflows/review_agent.md
+          gh agent run .github/workflows/review_agent.yml
       
       - name: Finalize Merge
         if: contains(github.event.comment.body, '/approve-and-merge')

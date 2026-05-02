@@ -68,7 +68,9 @@ jobs:
       - name: Invoke Repair Agent on Failure
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh agent run .github/prompts/repair-agent.prompt.md
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh agent run .github/prompts/repair-agent.prompt.md
 
   auto-review-and-merge:
     if: contains(github.event.comment.body, '/request-audit')

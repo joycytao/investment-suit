@@ -11,13 +11,23 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 
-FMP_API_KEY = os.getenv("FMP_API_KEY")
-ALPACA_KEY = os.getenv("ALPACA_API_KEY")
-ALPACA_SECRET = os.getenv("ALPACA_SECRET_KEY")
+try:
+    from scripts.trading_agent_env import load_runtime_config
+except ModuleNotFoundError:
+    from trading_agent_env import load_runtime_config
 
-# 初始化 Alpaca 客戶端
-trading_client = TradingClient(ALPACA_KEY, ALPACA_SECRET, paper=True)
-data_client = StockHistoricalDataClient(ALPACA_KEY, ALPACA_SECRET)
+FMP_API_KEY = None
+trading_client = None
+data_client = None
+
+
+def bootstrap_runtime():
+    global FMP_API_KEY, trading_client, data_client
+
+    config = load_runtime_config()
+    FMP_API_KEY = config.fmp_api_key
+    trading_client = TradingClient(config.alpaca_api_key, config.alpaca_secret_key, paper=True)
+    data_client = StockHistoricalDataClient(config.alpaca_api_key, config.alpaca_secret_key)
 
 # --- 2. FMP 篩選邏輯 ---
 def get_fmp_watchlist():
@@ -130,6 +140,7 @@ async def sniper_agent(symbol):
 
 # --- 4. 主程式入口 ---
 async def main():
+    bootstrap_runtime()
     watchlist = get_fmp_watchlist()
     if not watchlist:
         print("📭 今日無符合條件之標的。")
@@ -145,4 +156,8 @@ async def main():
         print("⏰ 交易時段結束，關閉程式。")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except RuntimeError as exc:
+        print(f"❌ {exc}")
+        raise SystemExit(1) from exc

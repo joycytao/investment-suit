@@ -27,6 +27,26 @@ jobs:
           pip install --upgrade pip
           pip install -r backend/requirements.txt
 
+      - name: Validate Trading Secrets
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        run: python - <<'PY'
+          import os
+          import sys
+
+          required = ["FMP_API_KEY", "ALPACA_API_KEY", "ALPACA_SECRET_KEY"]
+          missing = [name for name in required if not os.getenv(name, "").strip()]
+          if missing:
+              sys.exit(
+                  "Missing required GitHub Actions secrets: "
+                  + ", ".join(missing)
+              )
+
+          print("Trading secrets are configured.")
+          PY
+
       - name: Run Sniper Agent
         env:
           # Inject GitHub Secrets into Python environment variables

@@ -47,7 +47,7 @@ jobs:
       - name: Invoke Repair Agent on Failure
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh agent run .github/workflows/repair_agent.yml
+        run: gh agent run .github/prompts/repair-agent.prompt.md
 
   auto-review-and-merge:
     if: contains(github.event.comment.body, '/request-audit')
@@ -63,7 +63,7 @@ jobs:
         run: 
           # Explicitly tell gh to use the token for this session
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          gh agent run .github/workflows/review_agent.yml
+          gh agent run .github/prompts/review-agent.prompt.md
       
       - name: Finalize Merge
         if: contains(github.event.comment.body, '/approve-and-merge')

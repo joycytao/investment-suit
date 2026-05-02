@@ -3,7 +3,7 @@
 
 ## Objectives
 1. **Analyze**: Use `gh run view --log` to extract the stack trace and identify the root cause of the failure.
-2. **Apply Fix**: 
+2. **Apply Fix**:
    - Create a new branch named `ai/fix-<original-run-id>`.
    - Modify the source code to resolve the identified bug.
 3. **Submit**: Open a Pull Request titled "AI: Automated Fix for CI Failure".

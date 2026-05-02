@@ -22,16 +22,35 @@ data_client = StockHistoricalDataClient(ALPACA_KEY, ALPACA_SECRET)
 # --- 2. FMP 篩選邏輯 ---
 def get_fmp_watchlist():
     print("🔍 正在從 FMP 獲取今日 Low Float 清單...")
-    url = f"https://financialmodelingprep.com/api/v3/stock-screener?priceMoreThan=3&priceLowerThan=20&volumeMoreThan=300000&isEtf=false&apikey={FMP_API_KEY}"
     try:
-        stocks = requests.get(url).json()
+        stocks = requests.get(
+            "https://financialmodelingprep.com/stable/company-screener",
+            params={
+                "priceMoreThan": 3,
+                "priceLowerThan": 20,
+                "volumeMoreThan": 300000,
+                "isEtf": "false",
+                "isActivelyTrading": "true",
+                "limit": 15,
+                "apikey": FMP_API_KEY,
+            },
+            timeout=20,
+        ).json()
+        if not isinstance(stocks, list):
+            error_message = stocks.get("Error Message", "Unexpected screener response")
+            print(f"❌ 篩選失敗: {error_message}")
+            return []
+
         watchlist = []
-        for s in stocks[:15]:
+        for s in stocks:
             symbol = s['symbol']
-            p_url = f"https://financialmodelingprep.com/api/v3/profile/{symbol}?apikey={FMP_API_KEY}"
-            p_data = requests.get(p_url).json()
+            p_data = requests.get(
+                "https://financialmodelingprep.com/stable/profile",
+                params={"symbol": symbol, "apikey": FMP_API_KEY},
+                timeout=20,
+            ).json()
             if p_data:
-                mkt_cap = p_data[0].get('mktCap', 0)
+                mkt_cap = p_data[0].get('marketCap', 0)
                 price = p_data[0].get('price', 1)
                 if (mkt_cap / price) < 15000000: # Float < 15M
                     watchlist.append(symbol)

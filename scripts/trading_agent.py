@@ -194,7 +194,7 @@ async def main():
     
     # 市場開盤時間 9:30 CST
     market_open = datetime.now().replace(hour=9, minute=30, second=0, microsecond=0)
-    market_close = market_open + timedelta(hours=1)
+    market_close = market_open + timedelta(hours=3)
     
     daily_profit_tracker = {'profit': 0}
     

@@ -4,6 +4,7 @@ import requests
 import pandas as pd
 import pandas_ta as ta
 from datetime import datetime, timedelta
+from finvizfinance.screener.overview import Overview
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
@@ -20,6 +21,14 @@ FMP_API_KEY = None
 trading_client = None
 data_client = None
 
+MIN_PRICE = 3
+MAX_PRICE = 20
+MAX_FLOAT_SHARES = 10_000_000
+MIN_RELATIVE_VOLUME = 5
+MIN_CURRENT_VOLUME = 1_000_000
+MIN_PRICE_CHANGE_PERCENT = 10
+MAX_PRICE_CHANGE_PERCENT = 20
+
 
 def bootstrap_runtime():
     global FMP_API_KEY, trading_client, data_client
@@ -29,41 +38,57 @@ def bootstrap_runtime():
     trading_client = TradingClient(config.alpaca_api_key, config.alpaca_secret_key, paper=True)
     data_client = StockHistoricalDataClient(config.alpaca_api_key, config.alpaca_secret_key)
 
+
+def get_finviz_candidates():
+    filters = {
+        "Price": "$1 to $20",
+        "Float": "Under 10M",
+        "Relative Volume": "Over 5",
+        "Current Volume": "Over 1M",
+        "Change": "Up 10%",
+    }
+
+    overview = Overview()
+    overview.set_filter(filters_dict=filters)
+    screener_df = overview.screener_view()
+    if screener_df.empty:
+        return []
+
+    candidates = []
+    for row in screener_df.to_dict("records"):
+        candidates.append(
+            {
+                "symbol": row.get("Ticker"),
+                "price": float(row.get("Price") or 0),
+                "volume": float(row.get("Volume") or 0),
+                "changePercentage": float(row.get("Change") or 0) * 100,
+            }
+        )
+
+    return candidates
+
 # --- 2. FMP 篩選邏輯 ---
 def get_fmp_watchlist():
-    print("🔍 正在從 FMP 獲取今日 Low Float 清單...")
+    print("🔍 正在從 FinViz 獲取今日 Low Float 清單...")
     try:
-        stocks = requests.get(
-            "https://financialmodelingprep.com/stable/company-screener",
-            params={
-                "priceMoreThan": 3,
-                "priceLowerThan": 20,
-                "volumeMoreThan": 300000,
-                "isEtf": "false",
-                "isActivelyTrading": "true",
-                "limit": 15,
-                "apikey": FMP_API_KEY,
-            },
-            timeout=20,
-        ).json()
-        if not isinstance(stocks, list):
-            error_message = stocks.get("Error Message", "Unexpected screener response")
-            print(f"❌ 篩選失敗: {error_message}")
-            return []
+        stocks = get_finviz_candidates()
 
         watchlist = []
         for s in stocks:
-            symbol = s['symbol']
-            p_data = requests.get(
-                "https://financialmodelingprep.com/stable/profile",
-                params={"symbol": symbol, "apikey": FMP_API_KEY},
-                timeout=20,
-            ).json()
-            if p_data:
-                mkt_cap = p_data[0].get('marketCap', 0)
-                price = p_data[0].get('price', 1)
-                if (mkt_cap / price) < 15000000: # Float < 15M
-                    watchlist.append(symbol)
+            symbol = s["symbol"]
+            current_price = s.get("price", 0) or 0
+            current_volume = s.get("volume", 0) or 0
+            price_change = s.get("changePercentage", 0) or 0
+
+            if not (MIN_PRICE <= current_price <= MAX_PRICE):
+                continue
+            if current_volume < MIN_CURRENT_VOLUME:
+                continue
+            if not (MIN_PRICE_CHANGE_PERCENT <= price_change <= MAX_PRICE_CHANGE_PERCENT):
+                continue
+
+            watchlist.append(symbol)
+
         return watchlist
     except Exception as e:
         print(f"❌ 篩選失敗: {e}")

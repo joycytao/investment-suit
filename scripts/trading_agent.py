@@ -95,7 +95,7 @@ def get_fmp_watchlist():
         return []
 
 # --- 3. 你提供的核心監控與賣出邏輯 ---
-async def sniper_agent(symbol):
+async def sniper_agent(symbol, daily_profit_tracker):
     in_position = False
     entry_price = 0  
     qty = 100 
@@ -144,19 +144,44 @@ async def sniper_agent(symbol):
                 break_vwap = last['close'] < last['VWAP'] and prev['close'] >= prev['VWAP']
                 break_ema9 = last['close'] < last['EMA9'] and prev['close'] >= prev['EMA9']
 
-                if vol_spike_sell or macd_dead_cross or doji_exit or break_vwap or break_ema9:
+                # 第一層賣出: 向下破 9EMA, MACD 死叉, 出現十字星 (且獲利 > 2%), 獲利 > 10% -> sell 50%
+                profit_threshold = profit_pct > 0.10
+                if (break_ema9 or macd_dead_cross or doji_exit or profit_threshold):
+                    reasons = []
+                    if break_ema9: reasons.append("向下破9EMA")
+                    if macd_dead_cross: reasons.append("MACD死叉")
+                    if doji_exit: reasons.append(f"十字星(獲利>{profit_pct:.2%})")
+                    if profit_threshold: reasons.append(f"獲利>{profit_pct:10%}")
+                    
+                    sell_qty = qty // 2
+                    print(f"🚨 {symbol} 部分賣出觸發！理由: {', '.join(reasons)}，賣出50%({sell_qty}股)")
+                    order_data = MarketOrderRequest(symbol=symbol, qty=sell_qty, side=OrderSide.SELL, time_in_force=TimeInForce.DAY)
+                    trading_client.submit_order(order_data)
+                    qty = qty - sell_qty
+                    
+                    # 計算利潤並更新追蹤器
+                    profit = (current_price - entry_price) * sell_qty
+                    daily_profit_tracker['profit'] += profit
+                    print(f"💰 部分交易完成！利潤: ${profit:.2f}，日累計利潤: ${daily_profit_tracker['profit']:.2f}")
+
+                # 第二層賣出: 大量賣出, 向下突破 VWAP 剩下全賣
+                elif vol_spike_sell or break_vwap:
                     reasons = []
                     if vol_spike_sell: reasons.append("大量賣出")
-                    if macd_dead_cross: reasons.append("MACD死叉")
-                    if doji_exit: reasons.append(f"獲利達標({profit_pct:.2%})十字星")
-                    if break_vwap: reasons.append("破VWAP")
-                    if break_ema9: reasons.append("破EMA9")
+                    if break_vwap: reasons.append("向下突破VWAP")
                     
-                    print(f"🚨 {symbol} 賣出觸發！理由: {', '.join(reasons)}")
+                    print(f"🚨 {symbol} 全部賣出觸發！理由: {', '.join(reasons)}")
                     order_data = MarketOrderRequest(symbol=symbol, qty=qty, side=OrderSide.SELL, time_in_force=TimeInForce.DAY)
                     trading_client.submit_order(order_data)
                     in_position = False
-                    break 
+                    
+                    # 計算利潤並更新追蹤器
+                    profit = (current_price - entry_price) * qty
+                    daily_profit_tracker['profit'] += profit
+                    print(f"💰 交易完成！利潤: ${profit:.2f}，日累計利潤: ${daily_profit_tracker['profit']:.2f}")
+                    
+                    # 返回信號讓主程式知道這個標的已完成交易
+                    return
 
         except Exception as e:
             print(f"⚠️ {symbol} 錯誤: {e}")
@@ -166,19 +191,37 @@ async def sniper_agent(symbol):
 # --- 4. 主程式入口 ---
 async def main():
     bootstrap_runtime()
-    watchlist = get_fmp_watchlist()
-    if not watchlist:
-        print("📭 今日無符合條件之標的。")
-        return
-        
-    print(f"✅ 今日監控清單: {watchlist}")
     
-    # 使用 wait_for 設定 GitHub Actions 的強制結束時間 (例如 90 分鐘)
-    try:
-        tasks = [sniper_agent(s) for s in watchlist]
-        await asyncio.wait_for(asyncio.gather(*tasks), timeout=5400) 
-    except asyncio.TimeoutError:
-        print("⏰ 交易時段結束，關閉程式。")
+    # 市場開盤時間 9:30 CST
+    market_open = datetime.now().replace(hour=9, minute=30, second=0, microsecond=0)
+    market_close = market_open + timedelta(hours=1)
+    
+    daily_profit_tracker = {'profit': 0}
+    
+    while datetime.now() < market_close:
+        watchlist = get_fmp_watchlist()
+        if not watchlist:
+            print("📭 目前無符合條件之標的。")
+            await asyncio.sleep(60)
+            continue
+            
+        print(f"✅ 監控清單: {watchlist}，日累計利潤: ${daily_profit_tracker['profit']:.2f}")
+        
+        # 檢查是否已達到日利潤目標
+        if daily_profit_tracker['profit'] >= 100:
+            print(f"🎉 已達到日利潤目標 $100！結束交易。")
+            return
+        
+        # 並行監控所有標的
+        tasks = [sniper_agent(s, daily_profit_tracker) for s in watchlist]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # 檢查是否已達到日利潤目標
+        if daily_profit_tracker['profit'] >= 100:
+            print(f"🎉 已達到日利潤目標 $100！結束交易。")
+            return
+        
+        await asyncio.sleep(10)
 
 if __name__ == "__main__":
     try:

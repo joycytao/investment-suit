@@ -5,6 +5,11 @@ on:
     # GitHub Actions cron uses UTC. During Central Daylight Time, 8:30 AM CT = 13:30 UTC.
     - cron: '30 13 * * 1-5'
   workflow_dispatch: # Allow manual trigger from GitHub Actions UI
+    inputs:
+      execution_duration_minutes:
+        description: 'Execution window in minutes after the 8:30 AM Central start time'
+        required: false
+        default: '90' # Default to 90 minutes to cover the entire trading session
 
   pull_request:
     branches: [ main ]
@@ -53,6 +58,7 @@ jobs:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          EXECUTION_DURATION_MINUTES: ${{ github.event.inputs.execution_duration_minutes || '60' }}
         run: python scripts/trading_agent.py
   
   diagnose-failure: 

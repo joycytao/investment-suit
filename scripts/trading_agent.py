@@ -4,6 +4,7 @@ import requests
 import pandas as pd
 import pandas_ta as ta
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from finvizfinance.screener.overview import Overview
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest
@@ -28,6 +29,8 @@ MIN_RELATIVE_VOLUME = 5
 MIN_CURRENT_VOLUME = 1_000_000
 MIN_PRICE_CHANGE_PERCENT = 10
 MAX_PRICE_CHANGE_PERCENT = 20
+CENTRAL_TZ = ZoneInfo("America/Chicago")
+DEFAULT_EXECUTION_DURATION_MINUTES = 90
 
 
 def bootstrap_runtime():
@@ -37,6 +40,52 @@ def bootstrap_runtime():
     FMP_API_KEY = config.fmp_api_key
     trading_client = TradingClient(config.alpaca_api_key, config.alpaca_secret_key, paper=True)
     data_client = StockHistoricalDataClient(config.alpaca_api_key, config.alpaca_secret_key)
+
+
+def get_current_central_time():
+    return datetime.now(CENTRAL_TZ)
+
+
+def get_execution_duration_minutes():
+    raw_value = (os.getenv("EXECUTION_DURATION_MINUTES") or "").strip()
+    if not raw_value:
+        return DEFAULT_EXECUTION_DURATION_MINUTES
+
+    try:
+        duration_minutes = int(raw_value)
+    except ValueError:
+        print(
+            f"⚠️ Invalid EXECUTION_DURATION_MINUTES={raw_value!r}. "
+            f"Using default {DEFAULT_EXECUTION_DURATION_MINUTES} minutes."
+        )
+        return DEFAULT_EXECUTION_DURATION_MINUTES
+
+    if duration_minutes <= 0:
+        print(
+            f"⚠️ EXECUTION_DURATION_MINUTES must be greater than 0. "
+            f"Using default {DEFAULT_EXECUTION_DURATION_MINUTES} minutes."
+        )
+        return DEFAULT_EXECUTION_DURATION_MINUTES
+
+    return duration_minutes
+
+
+def get_execution_window(reference_time=None):
+    current_time = reference_time.astimezone(CENTRAL_TZ) if reference_time else get_current_central_time()
+    market_open = current_time.replace(hour=8, minute=30, second=0, microsecond=0)
+    market_close = market_open + timedelta(minutes=get_execution_duration_minutes())
+    return market_open, market_close
+
+
+def print_outside_execution_time(current_time, market_open, market_close):
+    formatted_current = current_time.strftime("%I:%M %p")
+    formatted_open = market_open.strftime("%I:%M %p")
+    formatted_close = market_close.strftime("%I:%M %p")
+    print(
+        "⏰ Outside execution time. "
+        f"Current time {formatted_current} {current_time.tzinfo} "
+        f"is outside the {formatted_open}-{formatted_close} {market_open.tzinfo} trading window."
+    )
 
 
 def get_finviz_candidates():
@@ -191,14 +240,17 @@ async def sniper_agent(symbol, daily_profit_tracker):
 # --- 4. 主程式入口 ---
 async def main():
     bootstrap_runtime()
-    
-    # 市場開盤時間 9:30 CST
-    market_open = datetime.now().replace(hour=9, minute=30, second=0, microsecond=0)
-    market_close = market_open + timedelta(hours=3)
+
+    current_time = get_current_central_time()
+    market_open, market_close = get_execution_window(current_time)
+
+    if current_time < market_open or current_time >= market_close:
+        print_outside_execution_time(current_time, market_open, market_close)
+        return
     
     daily_profit_tracker = {'profit': 0}
     
-    while datetime.now() < market_close:
+    while get_current_central_time() < market_close:
         watchlist = get_fmp_watchlist()
         if not watchlist:
             print("📭 目前無符合條件之標的。")

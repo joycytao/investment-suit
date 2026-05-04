@@ -2,9 +2,8 @@ name: Alpaca Bot
 
 on:
   schedule:
-    # Using Cron syntax here. US Eastern Time 09:30 AM = UTC 13:30 (Daylight Saving Time)
-    # Recommended to set at 13:31 UTC, run Monday through Friday
-    - cron: '31 13 * * 1-5'
+    # GitHub Actions cron uses UTC. During Central Daylight Time, 8:30 AM CT = 13:30 UTC.
+    - cron: '30 13 * * 1-5'
   workflow_dispatch: # Allow manual trigger from GitHub Actions UI
 
   pull_request:

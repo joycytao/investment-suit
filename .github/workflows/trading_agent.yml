@@ -59,7 +59,8 @@ jobs:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           EXECUTION_DURATION_MINUTES: ${{ github.event.inputs.execution_duration_minutes || '60' }}
-        run: python scripts/trading_agent.py
+          PYTHONUNBUFFERED: '1'
+        run: python -u scripts/trading_agent.py
   
   diagnose-failure: 
     runs-on: ubuntu-latest

@@ -62,15 +62,15 @@ def bootstrap_runtime():
 
 async def validate_news_with_ai(symbol):
     if news_client is None:
-        print(f"⚠️ News client unavailable for {symbol}. Skipping news validation.")
-        return True
+        print(f"⚠️ News client unavailable for {symbol}. Rejecting symbol until news validation recovers.")
+        return False
 
     try:
         request_params = NewsRequest(symbols=symbol, limit=NEWS_LOOKUP_LIMIT)
         news = news_client.get_news(request_params)
     except Exception as exc:
-        print(f"⚠️ {symbol} 新聞取得失敗: {exc}。本輪略過新聞篩選。")
-        return True
+        print(f"⚠️ {symbol} 新聞取得失敗: {exc}。本輪拒絕監控，直到新聞驗證恢復。")
+        return False
 
     news_items = getattr(news, "news", [])
     if not news_items:
@@ -94,8 +94,8 @@ async def validate_news_with_ai(symbol):
     print(f"🤖 正在請 AI 評估 {symbol} 的新聞品質...")
     ai_opinion = await ask_ai_sentiment(symbol, headlines_text)
     if ai_opinion is None:
-        print(f"⚠️ AI 無法評估 {symbol}，本輪略過 AI 新聞篩選。")
-        return True
+        print(f"⚠️ AI 無法評估 {symbol}，本輪拒絕監控。")
+        return False
 
     print(f"📊 AI 評估結果：\n{ai_opinion}")
     return is_positive_ai_verdict(ai_opinion)
@@ -261,6 +261,20 @@ async def sniper_agent(symbol, daily_profit_tracker):
 
             # --- 賣出邏輯 ---
             else:
+                ct_timezone = pytz.timezone("US/Central")
+                now_ct = datetime.datetime.now(ct_timezone)
+
+                if now_ct.hour == 14 and now_ct.minute >= 55:
+                    print(f"⏰ 當前時間 {now_ct.strftime('%H:%M')}，接近收盤！")
+                    print(f"🚨 強制清倉所有標的，包含 {symbol}")
+                    
+                    # 呼叫 Alpaca API 清空所有倉位並取消掛單
+                    trading_client.close_all_positions(cancel_orders=True)
+                    
+                    in_position = False
+                    return # 結束此 Agent 任務
+
+
                 profit_pct = (current_price - entry_price) / entry_price
                 avg_vol = df['volume'].iloc[-6:-1].mean()
                 

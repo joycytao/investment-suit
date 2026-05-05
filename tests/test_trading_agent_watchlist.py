@@ -90,7 +90,7 @@ class TradingAgentWatchlistTests(unittest.TestCase):
         self.assertIn("FDA approval secured", aggregated_news)
         self.assertIn("No dilution mentioned", aggregated_news)
 
-    def test_validate_news_with_ai_allows_trading_when_news_lookup_fails(self):
+    def test_validate_news_with_ai_rejects_symbol_when_news_lookup_fails(self):
         mock_client = Mock()
         mock_client.get_news.side_effect = RuntimeError("news unavailable")
 
@@ -98,7 +98,28 @@ class TradingAgentWatchlistTests(unittest.TestCase):
             with patch("scripts.trading_agent.news_client", mock_client, create=True):
                 result = trading_agent.asyncio.run(trading_agent.validate_news_with_ai("GOOD"))
 
-        self.assertTrue(result)
+        self.assertFalse(result)
+
+    def test_validate_news_with_ai_rejects_symbol_when_ai_cannot_evaluate(self):
+        news_items = [
+            SimpleNamespace(
+                created_at="2026-05-04T08:35:00Z",
+                headline="Catalyst pending confirmation",
+                summary="Headline exists but AI evaluation is unavailable.",
+            )
+        ]
+        mock_client = Mock()
+        mock_client.get_news.return_value = SimpleNamespace(news=news_items)
+
+        with patch("scripts.trading_agent.NewsRequest", return_value="request"):
+            with patch("scripts.trading_agent.news_client", mock_client, create=True):
+                with patch(
+                    "scripts.trading_agent.ask_ai_sentiment",
+                    new=AsyncMock(return_value=None),
+                ):
+                    result = trading_agent.asyncio.run(trading_agent.validate_news_with_ai("GOOD"))
+
+        self.assertFalse(result)
 
     def test_validate_news_with_ai_requires_explicit_yes_verdict(self):
         news_items = [

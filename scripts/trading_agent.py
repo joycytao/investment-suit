@@ -167,17 +167,19 @@ def print_outside_execution_time(current_time, market_open, market_close):
 
 def get_finviz_candidates():
     filters = {
-        "Price": "$1 to $20",
-        "Float": "Under 10M",
-        "Relative Volume": "Over 5",
-        "Current Volume": "Over 1M",
-        "Change": "Up 10%",
+        "Price": "1 to 20",
+        "Float": "U10M",
+        "Relative Volume": "o5",
+        "Current Volume": "o1000000",
+        "Change": "u10",
     }
 
     overview = Overview()
     overview.set_filter(filters_dict=filters)
     screener_df = overview.screener_view()
+    print(f"📊 FinViz screener returned {len(screener_df)} rows")
     if screener_df.empty:
+        print("⚠️ Empty DataFrame from FinViz - check filter format")
         return []
 
     candidates = []

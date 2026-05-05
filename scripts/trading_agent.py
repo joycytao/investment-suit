@@ -9,9 +9,11 @@ from finvizfinance.screener.overview import Overview
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
-from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest
+from alpaca.data.historical import StockHistoricalDataClient, NewsClient
+from alpaca.data.requests import StockBarsRequest, NewsRequest
 from alpaca.data.timeframe import TimeFrame
+
+from google import genai
 
 try:
     from scripts.trading_agent_env import load_runtime_config
@@ -21,6 +23,8 @@ except ModuleNotFoundError:
 FMP_API_KEY = None
 trading_client = None
 data_client = None
+news_client = None
+ai_client = None
 
 MIN_PRICE = 3
 MAX_PRICE = 20
@@ -31,15 +35,88 @@ MIN_PRICE_CHANGE_PERCENT = 10
 MAX_PRICE_CHANGE_PERCENT = 20
 CENTRAL_TZ = ZoneInfo("America/Chicago")
 DEFAULT_EXECUTION_DURATION_MINUTES = 90
+NEWS_LOOKUP_LIMIT = 5
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 
 
 def bootstrap_runtime():
-    global FMP_API_KEY, trading_client, data_client
+    global FMP_API_KEY, trading_client, data_client, news_client, ai_client
 
     config = load_runtime_config()
     FMP_API_KEY = config.fmp_api_key
     trading_client = TradingClient(config.alpaca_api_key, config.alpaca_secret_key, paper=True)
     data_client = StockHistoricalDataClient(config.alpaca_api_key, config.alpaca_secret_key)
+    news_client = NewsClient(config.alpaca_api_key, config.alpaca_secret_key)
+
+    google_api_key = (os.getenv("GOOGLE_API_KEY") or "").strip()
+    if not google_api_key:
+        ai_client = None
+        return
+
+    try:
+        ai_client = genai.Client(api_key=google_api_key)
+    except Exception as exc:
+        ai_client = None
+        print(f"⚠️ AI client initialization failed: {exc}. Skipping AI news filtering.")
+
+
+async def validate_news_with_ai(symbol):
+    if news_client is None:
+        print(f"⚠️ News client unavailable for {symbol}. Skipping news validation.")
+        return True
+
+    try:
+        request_params = NewsRequest(symbols=symbol, limit=NEWS_LOOKUP_LIMIT)
+        news = news_client.get_news(request_params)
+    except Exception as exc:
+        print(f"⚠️ {symbol} 新聞取得失敗: {exc}。本輪略過新聞篩選。")
+        return True
+
+    news_items = getattr(news, "news", [])
+    if not news_items:
+        print(f"⚠️ {symbol} 沒有即時新聞，小心是純籌碼炒作。")
+        return False
+
+    for n in news_items:
+        print(f"🕒 {n.created_at} | 📰 {n.headline}")
+
+    headlines_text = "\n\n".join(
+        "\n".join(
+            part
+            for part in (
+                f"Headline: {item.headline}",
+                f"Summary: {getattr(item, 'summary', '')}" if getattr(item, "summary", "") else "",
+            )
+            if part
+        )
+        for item in news_items
+    )
+    print(f"🤖 正在請 AI 評估 {symbol} 的新聞品質...")
+    ai_opinion = await ask_ai_sentiment(symbol, headlines_text)
+    if ai_opinion is None:
+        print(f"⚠️ AI 無法評估 {symbol}，本輪略過 AI 新聞篩選。")
+        return True
+
+    print(f"📊 AI 評估結果：\n{ai_opinion}")
+    return is_positive_ai_verdict(ai_opinion)
+
+
+async def filter_watchlist_by_news(watchlist):
+    approved_watchlist = []
+    for symbol in watchlist:
+        is_news_positive = await validate_news_with_ai(symbol)
+        if not is_news_positive:
+            print(f"⚠️ {symbol} 的新聞評估不佳，跳過監控。")
+            continue
+        approved_watchlist.append(symbol)
+
+    return approved_watchlist
+
+
+def is_positive_ai_verdict(ai_opinion):
+    normalized_verdict = (ai_opinion or "").strip().upper()
+    return normalized_verdict.startswith("[YES]") or normalized_verdict.startswith("YES")
+
 
 
 def get_current_central_time():
@@ -72,7 +149,7 @@ def get_execution_duration_minutes():
 
 def get_execution_window(reference_time=None):
     current_time = reference_time.astimezone(CENTRAL_TZ) if reference_time else get_current_central_time()
-    market_open = current_time.replace(hour=8, minute=30, second=0, microsecond=0)
+    market_open = current_time.replace(hour=8, minute=15, second=0, microsecond=0)
     market_close = market_open + timedelta(minutes=get_execution_duration_minutes())
     return market_open, market_close
 
@@ -165,6 +242,7 @@ async def sniper_agent(symbol, daily_profit_tracker):
             # 指標計算
             df['VWAP'] = ta.vwap(df.high, df.low, df.close, df.volume)
             df['EMA9'] = ta.ema(df.close, length=9)
+            df['EMA20'] = ta.ema(df.close, length=20)
             macd = df.ta.macd()
             df = pd.concat([df, macd], axis=1)
             
@@ -174,7 +252,7 @@ async def sniper_agent(symbol, daily_profit_tracker):
 
             # --- 買入邏輯 ---
             if not in_position:
-                if last['MACDh_12_26_9'] > 0 and prev['MACDh_12_26_9'] <= 0:
+                if current_price > last['VWAP'] and current_price > last['EMA20']:
                     print(f"🎯 {symbol} 買入信號觸發！價格: {current_price}")
                     order_data = MarketOrderRequest(symbol=symbol, qty=qty, side=OrderSide.BUY, time_in_force=TimeInForce.DAY)
                     trading_client.submit_order(order_data)
@@ -193,49 +271,93 @@ async def sniper_agent(symbol, daily_profit_tracker):
                 break_vwap = last['close'] < last['VWAP'] and prev['close'] >= prev['VWAP']
                 break_ema9 = last['close'] < last['EMA9'] and prev['close'] >= prev['EMA9']
 
-                # 第一層賣出: 向下破 9EMA, MACD 死叉, 出現十字星 (且獲利 > 2%), 獲利 > 10% -> sell 50%
-                profit_threshold = profit_pct > 0.10
-                if (break_ema9 or macd_dead_cross or doji_exit or profit_threshold):
-                    reasons = []
-                    if break_ema9: reasons.append("向下破9EMA")
-                    if macd_dead_cross: reasons.append("MACD死叉")
-                    if doji_exit: reasons.append(f"十字星(獲利>{profit_pct:.2%})")
-                    if profit_threshold: reasons.append(f"獲利>{profit_pct:10%}")
-                    
-                    sell_qty = qty // 2
-                    print(f"🚨 {symbol} 部分賣出觸發！理由: {', '.join(reasons)}，賣出50%({sell_qty}股)")
-                    order_data = MarketOrderRequest(symbol=symbol, qty=sell_qty, side=OrderSide.SELL, time_in_force=TimeInForce.DAY)
-                    trading_client.submit_order(order_data)
-                    qty = qty - sell_qty
-                    
-                    # 計算利潤並更新追蹤器
-                    profit = (current_price - entry_price) * sell_qty
-                    daily_profit_tracker['profit'] += profit
-                    print(f"💰 部分交易完成！利潤: ${profit:.2f}，日累計利潤: ${daily_profit_tracker['profit']:.2f}")
 
-                # 第二層賣出: 大量賣出, 向下突破 VWAP 剩下全賣
-                elif vol_spike_sell or break_vwap:
-                    reasons = []
-                    if vol_spike_sell: reasons.append("大量賣出")
-                    if break_vwap: reasons.append("向下突破VWAP")
+                hard_stop = profit_pct <= -0.015
+                if profit_pct < 0.05:
+                    if hard_stop or break_vwap or vol_spike_sell:
+                        reasons = []
+                        if hard_stop: reasons.append(f"硬止損觸發({profit_pct:.2%})")
+                        if break_vwap: reasons.append("向下突破VWAP")
+                        if vol_spike_sell: reasons.append("放量下跌")
+                        
+                        print(f"🚨 {symbol} 保護性賣出！理由: {', '.join(reasons)}")
+                        order_data = MarketOrderRequest(symbol=symbol, qty=qty, side=OrderSide.SELL, time_in_force=TimeInForce.DAY)
+                        trading_client.submit_order(order_data)
+                        
+                        # 計算利潤並結束該筆交易
+                        profit = (current_price - entry_price) * qty
+                        daily_profit_tracker['profit'] += profit
+                        in_position = False
+                        print(f"💰 止損/保護完成！利潤: ${profit:.2f}，日累計: ${daily_profit_tracker['profit']:.2f}")
+                        return
+                else:
+                    # A. 第一層賣出 (減倉 50%): 偵測趨勢走弱
+                    doji_exit = is_doji # 此時已獲利 > 5%，不需額外 check 2%
+                    profit_threshold_10 = profit_pct > 0.10
                     
-                    print(f"🚨 {symbol} 全部賣出觸發！理由: {', '.join(reasons)}")
-                    order_data = MarketOrderRequest(symbol=symbol, qty=qty, side=OrderSide.SELL, time_in_force=TimeInForce.DAY)
-                    trading_client.submit_order(order_data)
-                    in_position = False
-                    
-                    # 計算利潤並更新追蹤器
-                    profit = (current_price - entry_price) * qty
-                    daily_profit_tracker['profit'] += profit
-                    print(f"💰 交易完成！利潤: ${profit:.2f}，日累計利潤: ${daily_profit_tracker['profit']:.2f}")
-                    
-                    # 返回信號讓主程式知道這個標的已完成交易
-                    return
+                    if (break_ema9 or macd_dead_cross or doji_exit or profit_threshold_10):
+                        reasons = []
+                        if break_ema9: reasons.append("向下破9EMA")
+                        if macd_dead_cross: reasons.append("MACD死叉")
+                        if doji_exit: reasons.append("高位十字星")
+                        if profit_threshold_10: reasons.append(f"達到10%目標")
+                        
+                        sell_qty = qty // 2
+                        if sell_qty > 0:
+                            print(f"💰 {symbol} 獲利入袋！理由: {', '.join(reasons)}，賣出50%({sell_qty}股)")
+                            order_data = MarketOrderRequest(symbol=symbol, qty=sell_qty, side=OrderSide.SELL, time_in_force=TimeInForce.DAY)
+                            trading_client.submit_order(order_data)
+                            
+                            # 更新剩餘部位與利潤
+                            profit = (current_price - entry_price) * sell_qty
+                            daily_profit_tracker['profit'] += profit
+                            qty -= sell_qty
+                            print(f"💵 部分獲利累計: ${daily_profit_tracker['profit']:.2f}")
+
+                    # B. 第二層全賣 (剩餘出清): 趨勢徹底反轉
+                    # 即使獲利超過 5%，若跌回 VWAP 或出現極大量賣壓，則清倉
+                    elif break_vwap or vol_spike_sell:
+                        print(f"🚨 {symbol} 趨勢反轉清倉！理由: {'破VWAP' if break_vwap else '放量賣壓'}")
+                        order_data = MarketOrderRequest(symbol=symbol, qty=qty, side=OrderSide.SELL, time_in_force=TimeInForce.DAY)
+                        trading_client.submit_order(order_data)
+                        
+                        profit = (current_price - entry_price) * qty
+                        daily_profit_tracker['profit'] += profit
+                        in_position = False
+                        print(f"💰 交易完整結束！日總利潤: ${daily_profit_tracker['profit']:.2f}")
+                        return
 
         except Exception as e:
             print(f"⚠️ {symbol} 錯誤: {e}")
             
         await asyncio.sleep(30)
+        
+
+async def ask_ai_sentiment(symbol, all_headlines):
+    if ai_client is None:
+        return None
+
+    prompt = f"""
+    你現在是一位美股當沖專家。請分析股票 {symbol} 的以下新聞標題：
+    
+    {all_headlines}
+    
+    請幫我做三件事：
+    1. 判斷這是不是強利多 (FDA、合約、併購、財報大好)？
+    2. 有沒有看到 'Offering' 或 'Warrants' 等增發圈錢的陷阱？
+    3. 最終決定：該股是否值得今天狙擊？(回答 YES 或 NO)
+    
+    格式請簡短，例如：[YES] 理由：FDA通過。
+    """
+    try:
+        response = ai_client.models.generate_content(
+            model=(os.getenv("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL).strip(),
+            contents=prompt,
+        )
+        return getattr(response, "text", None)
+    except Exception as e:
+        print(f"⚠️ AI 分析失敗: {e}")
+        return None
 
 # --- 4. 主程式入口 ---
 async def main():
@@ -256,7 +378,13 @@ async def main():
             print("📭 目前無符合條件之標的。")
             await asyncio.sleep(60)
             continue
-            
+
+        watchlist = await filter_watchlist_by_news(watchlist)
+        if not watchlist:
+            print("📭 新聞篩選後無符合條件之標的。")
+            await asyncio.sleep(60)
+            continue
+        
         print(f"✅ 監控清單: {watchlist}，日累計利潤: ${daily_profit_tracker['profit']:.2f}")
         
         # 檢查是否已達到日利潤目標

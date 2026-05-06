@@ -167,11 +167,11 @@ def print_outside_execution_time(current_time, market_open, market_close):
 
 def get_finviz_candidates():
     filters = {
-        "Price": "1 to 20",
-        "Float": "U10M",
-        "Relative Volume": "o5",
-        "Current Volume": "o1000000",
-        "Change": "u10",
+        "Price": "$3 to $20",
+        "Float": "Under 10M",
+        "Relative Volume": "Over 5",
+        "Current Volume": "Over 1M",
+        "Change": "Up 10%",
     }
 
     overview = Overview()
@@ -201,21 +201,23 @@ def get_fmp_watchlist():
     try:
         stocks = get_finviz_candidates()
 
-        watchlist = []
-        for s in stocks:
-            symbol = s["symbol"]
-            current_price = s.get("price", 0) or 0
-            current_volume = s.get("volume", 0) or 0
-            price_change = s.get("changePercentage", 0) or 0
+        # watchlist = []
+        # for s in stocks:
+        #     symbol = s["symbol"]
+        #     current_price = s.get("price", 0) or 0
+        #     current_volume = s.get("volume", 0) or 0
+        #     price_change = s.get("changePercentage", 0) or 0
 
-            if not (MIN_PRICE <= current_price <= MAX_PRICE):
-                continue
-            if current_volume < MIN_CURRENT_VOLUME:
-                continue
-            if not (MIN_PRICE_CHANGE_PERCENT <= price_change <= MAX_PRICE_CHANGE_PERCENT):
-                continue
+        #     if not (MIN_PRICE <= current_price <= MAX_PRICE):
+        #         continue
+        #     if current_volume < MIN_CURRENT_VOLUME:
+        #         continue
+        #     if not (MIN_PRICE_CHANGE_PERCENT <= price_change <= MAX_PRICE_CHANGE_PERCENT):
+        #         continue
 
-            watchlist.append(symbol)
+        #     watchlist.append(symbol)
+
+        watchlist = [s["symbol"] for s in stocks]
 
         return watchlist
     except Exception as e:

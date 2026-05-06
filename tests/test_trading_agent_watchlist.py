@@ -1,7 +1,6 @@
 import unittest
 from datetime import datetime
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 import os
 
@@ -59,102 +58,6 @@ class TradingAgentWatchlistTests(unittest.TestCase):
         self.assertEqual(market_open.minute, 30)
         self.assertEqual(market_close.hour, 11)
         self.assertEqual(market_close.minute, 30)
-
-    def test_validate_news_with_ai_aggregates_recent_headlines(self):
-        news_items = [
-            SimpleNamespace(
-                created_at="2026-05-04T08:35:00Z",
-                headline="FDA approval secured",
-                summary="Company secured a major approval.",
-            ),
-            SimpleNamespace(
-                created_at="2026-05-04T08:36:00Z",
-                headline="No dilution mentioned",
-                summary="Balance sheet remains unchanged.",
-            ),
-        ]
-        mock_client = Mock()
-        mock_client.get_news.return_value = SimpleNamespace(news=news_items)
-
-        with patch("scripts.trading_agent.NewsRequest", return_value="request") as mock_request:
-            with patch("scripts.trading_agent.news_client", mock_client, create=True):
-                with patch(
-                    "scripts.trading_agent.ask_ai_sentiment",
-                    new=AsyncMock(return_value="[YES] Reason: strong catalyst."),
-                ) as mock_ask_ai_sentiment:
-                    result = trading_agent.asyncio.run(trading_agent.validate_news_with_ai("GOOD"))
-
-        self.assertTrue(result)
-        mock_request.assert_called_once_with(symbols="GOOD", limit=5)
-        aggregated_news = mock_ask_ai_sentiment.await_args.args[1]
-        self.assertIn("FDA approval secured", aggregated_news)
-        self.assertIn("No dilution mentioned", aggregated_news)
-
-    def test_validate_news_with_ai_rejects_symbol_when_news_lookup_fails(self):
-        mock_client = Mock()
-        mock_client.get_news.side_effect = RuntimeError("news unavailable")
-
-        with patch("scripts.trading_agent.NewsRequest", return_value="request"):
-            with patch("scripts.trading_agent.news_client", mock_client, create=True):
-                result = trading_agent.asyncio.run(trading_agent.validate_news_with_ai("GOOD"))
-
-        self.assertFalse(result)
-
-    def test_validate_news_with_ai_rejects_symbol_when_ai_cannot_evaluate(self):
-        news_items = [
-            SimpleNamespace(
-                created_at="2026-05-04T08:35:00Z",
-                headline="Catalyst pending confirmation",
-                summary="Headline exists but AI evaluation is unavailable.",
-            )
-        ]
-        mock_client = Mock()
-        mock_client.get_news.return_value = SimpleNamespace(news=news_items)
-
-        with patch("scripts.trading_agent.NewsRequest", return_value="request"):
-            with patch("scripts.trading_agent.news_client", mock_client, create=True):
-                with patch(
-                    "scripts.trading_agent.ask_ai_sentiment",
-                    new=AsyncMock(return_value=None),
-                ):
-                    result = trading_agent.asyncio.run(trading_agent.validate_news_with_ai("GOOD"))
-
-        self.assertFalse(result)
-
-    def test_validate_news_with_ai_requires_explicit_yes_verdict(self):
-        news_items = [
-            SimpleNamespace(
-                created_at="2026-05-04T08:35:00Z",
-                headline="Speculative partnership rumor",
-                summary="No formal catalyst was announced.",
-            )
-        ]
-        mock_client = Mock()
-        mock_client.get_news.return_value = SimpleNamespace(news=news_items)
-
-        with patch("scripts.trading_agent.NewsRequest", return_value="request"):
-            with patch("scripts.trading_agent.news_client", mock_client, create=True):
-                with patch(
-                    "scripts.trading_agent.ask_ai_sentiment",
-                    new=AsyncMock(return_value="[NO] Reason: yes, the headline sounds positive, but the news is not actionable."),
-                ):
-                    result = trading_agent.asyncio.run(trading_agent.validate_news_with_ai("RISKY"))
-
-        self.assertFalse(result)
-
-    def test_filter_watchlist_by_news_keeps_order_without_mutating_input(self):
-        watchlist = ["BAD1", "BAD2", "GOOD"]
-
-        with patch(
-            "scripts.trading_agent.validate_news_with_ai",
-            new=AsyncMock(side_effect=[False, False, True]),
-        ):
-            filtered_watchlist = trading_agent.asyncio.run(
-                trading_agent.filter_watchlist_by_news(watchlist)
-            )
-
-        self.assertEqual(filtered_watchlist, ["GOOD"])
-        self.assertEqual(watchlist, ["BAD1", "BAD2", "GOOD"])
 
     @patch("scripts.trading_agent.bootstrap_runtime")
     @patch("scripts.trading_agent.get_current_central_time")

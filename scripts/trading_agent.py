@@ -167,7 +167,7 @@ def print_outside_execution_time(current_time, market_open, market_close):
 
 def get_finviz_candidates():
     filters = {
-        "Price": "$3 to $20",
+        "Price": "Under $20",
         "Float": "Under 10M",
         "Relative Volume": "Over 5",
         "Current Volume": "Over 1M",

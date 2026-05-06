@@ -106,7 +106,7 @@ async def filter_watchlist_by_news(watchlist):
     for symbol in watchlist:
         is_news_positive = await validate_news_with_ai(symbol)
         if not is_news_positive:
-            print(f"⚠️ {symbol} 的新聞評估不佳，跳過監控。")
+            print(f"⚠️ {symbol} 的新聞評估沒有結果，跳過監控。")
             continue
         approved_watchlist.append(symbol)
 
@@ -400,7 +400,7 @@ async def main():
         watchlist = await filter_watchlist_by_news(watchlist)
         if not watchlist:
             print("📭 新聞篩選後無符合條件之標的。")
-            await asyncio.sleep(60)
+            await asyncio.sleep(60 * 5)
             continue
         
         print(f"✅ 監控清單: {watchlist}，日累計利潤: ${daily_profit_tracker['profit']:.2f}")

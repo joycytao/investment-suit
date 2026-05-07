@@ -42,7 +42,7 @@ def add_indicators(df):
     return df
 
 def run_qqq_backtest():
-    symbol = "NVDA"
+    symbol = "QQQ"
     client = build_data_client()
     print(f"正在獲取 {symbol} 歷史數據...")
     
@@ -57,7 +57,7 @@ def run_qqq_backtest():
     
     # 抓取數據並轉為 DataFrame
     bars = client.get_stock_bars(request_params).df.xs(symbol)
-    
+
     # 將 1 分鐘線合成 5 分鐘線 (做 T 核心週期)
     df = bars.resample('5min').agg({
         'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'

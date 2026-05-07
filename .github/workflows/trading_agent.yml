@@ -7,7 +7,7 @@ on:
   workflow_dispatch: # Allow manual trigger from GitHub Actions UI
     inputs:
       execution_duration_minutes:
-        description: 'Execution window in minutes after the 8:30 AM Central start time'
+        description: 'Execution window in minutes after the 8:15 AM Central start time'
         required: false
         default: '90' # Default to 90 minutes to cover the entire trading session
 
@@ -58,7 +58,7 @@ jobs:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
-          EXECUTION_DURATION_MINUTES: ${{ github.event.inputs.execution_duration_minutes || '60' }}
+          EXECUTION_DURATION_MINUTES: ${{ github.event.inputs.execution_duration_minutes || '90' }}
           PYTHONUNBUFFERED: '1'
         run: python -u scripts/trading_agent.py
   

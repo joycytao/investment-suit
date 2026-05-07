@@ -157,10 +157,12 @@ def print_outside_execution_time(current_time, market_open, market_close):
     )
 
 
-def normalize_bar_index(df):
-    if df.index.tz is None:
-        return df.tz_localize("UTC").tz_convert(CENTRAL_TZ)
-    return df.tz_convert(CENTRAL_TZ)
+def normalize_bar_index(index):
+    if isinstance(index, pd.MultiIndex):
+        index = index.get_level_values(-1)
+    if index.tz is None:
+        return index.tz_localize("UTC").tz_convert(CENTRAL_TZ)
+    return index.tz_convert(CENTRAL_TZ)
 
 
 def fetch_signal_frame(symbol=SYMBOL, reference_time=None):
@@ -180,7 +182,7 @@ def fetch_signal_frame(symbol=SYMBOL, reference_time=None):
         return None
 
     symbol_bars = symbol_bars.copy()
-    symbol_bars.index = normalize_bar_index(symbol_bars)
+    symbol_bars.index = normalize_bar_index(symbol_bars.index)
     frame = symbol_bars.resample("5min").agg(
         {
             "open": "first",

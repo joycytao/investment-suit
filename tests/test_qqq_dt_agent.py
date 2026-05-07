@@ -4,9 +4,10 @@ import sys
 import unittest
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from types import SimpleNamespace
 
 import pandas as pd
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 MODULE_NAME = "scripts.qqq_dt_agent"
@@ -179,6 +180,57 @@ class QqqDayTradeAgentTests(unittest.TestCase):
         )
 
         self.assertEqual(reason, module.EXIT_REASON_MARKET_CLOSE)
+
+    def test_fetch_signal_frame_uses_datetime_index_after_symbol_lookup(self):
+        with patch.dict(
+            os.environ,
+            {
+                "ALPACA_API_KEY": "alpaca-test",
+                "ALPACA_SECRET_KEY": "secret-test",
+            },
+            clear=True,
+        ):
+            with patch("dotenv.load_dotenv"):
+                module = self._import_module()
+
+        timestamps = pd.date_range(
+            "2026-05-06 13:30:00",
+            periods=240,
+            freq="min",
+            tz="UTC",
+        )
+        close_series = pd.Series(
+            [100 + (index * 0.02) for index in range(len(timestamps))],
+            index=timestamps,
+            dtype=float,
+        )
+        bars_frame = pd.DataFrame(
+            {
+                "open": close_series - 0.1,
+                "high": close_series + 0.2,
+                "low": close_series - 0.2,
+                "close": close_series,
+                "volume": pd.Series(
+                    [1_000_000 + index * 1000 for index in range(len(timestamps))],
+                    index=timestamps,
+                    dtype=float,
+                ),
+            }
+        )
+        bars_frame["symbol"] = module.SYMBOL
+        bars_frame = bars_frame.set_index("symbol", append=True).swaplevel(0, 1)
+
+        mock_data_client = Mock()
+        mock_data_client.get_stock_bars.return_value = SimpleNamespace(df=bars_frame)
+
+        with patch.object(module, "data_client", mock_data_client):
+            frame = module.fetch_signal_frame(
+                symbol=module.SYMBOL,
+                reference_time=datetime(2026, 5, 6, 9, 30, tzinfo=CENTRAL_TZ),
+            )
+
+        self.assertIsNotNone(frame)
+        self.assertIsInstance(frame.index, pd.DatetimeIndex)
 
 
 if __name__ == "__main__":

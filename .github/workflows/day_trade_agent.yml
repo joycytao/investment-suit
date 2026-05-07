@@ -3,13 +3,13 @@ name: QQQ Day Trade Bot
 on:
   schedule:
     # GitHub Actions cron uses UTC. During Central Daylight Time, 8:30 AM CT = 13:30 UTC.
-    - cron: '30 13 * * 1-5'
+    - cron: '15 13 * * 1-5'
   workflow_dispatch:
     inputs:
       execution_duration_minutes:
         description: 'Execution window in minutes after the 8:30 AM Central start time'
         required: false
-        default: '385'
+        default: '315'
 
 jobs:
   trade:
@@ -52,7 +52,7 @@ jobs:
         env:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
-          EXECUTION_DURATION_MINUTES: ${{ github.event.inputs.execution_duration_minutes || '385' }}
+          EXECUTION_DURATION_MINUTES: ${{ github.event.inputs.execution_duration_minutes || '315' }}
           PYTHONUNBUFFERED: '1'
         run: python -u scripts/qqq_dt_agent.py
 

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from finvizfinance.screener.overview import Overview
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
 from alpaca.data.historical import StockHistoricalDataClient, NewsClient
 from alpaca.data.requests import StockBarsRequest, NewsRequest
@@ -258,7 +258,7 @@ async def sniper_agent(symbol, daily_profit_tracker):
             if not in_position:
                 if current_price > last['VWAP'] and current_price > last['EMA20']:
                     print(f"🎯 {symbol} 買入信號觸發！價格: {current_price}")
-                    order_data = MarketOrderRequest(symbol=symbol, qty=qty, side=OrderSide.BUY, type=OrderType.LIMIT, price=current_price, time_in_force=TimeInForce.DAY)
+                    order_data = LimitOrderRequest(symbol=symbol, qty=qty, side=OrderSide.BUY, type=OrderType.LIMIT, price=current_price, time_in_force=TimeInForce.DAY)
                     trading_client.submit_order(order_data)
                     entry_price = current_price
                     in_position = True

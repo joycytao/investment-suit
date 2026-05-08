@@ -265,8 +265,7 @@ async def sniper_agent(symbol, daily_profit_tracker):
 
             # --- 賣出邏輯 ---
             else:
-                ct_timezone = pytz.timezone("US/Central")
-                now_ct = datetime.datetime.now(ct_timezone)
+                now_ct = get_current_central_time()
 
                 if now_ct.hour == 14 and now_ct.minute >= 55:
                     print(f"⏰ 當前時間 {now_ct.strftime('%H:%M')}，接近收盤！")

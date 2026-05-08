@@ -116,6 +116,38 @@ class TradingAgentSniperTests(unittest.TestCase):
         self.assertEqual(partial_sell_order.qty, 50)
         self.assertAlmostEqual(daily_profit_tracker["profit"], 56.5, places=2)
 
+    def test_sniper_agent_closes_all_positions_near_market_close(self):
+        symbol = "MASK"
+        entry_frame = self._build_bars_frame(symbol, [5 + (0.13 * index) for index in range(40)])
+        exit_frame = self._build_bars_frame(symbol, [5.5 + (0.145 * index) for index in range(40)])
+        mock_data_client = Mock()
+        mock_data_client.get_stock_bars.side_effect = [
+            SimpleNamespace(df=entry_frame),
+            SimpleNamespace(df=exit_frame),
+        ]
+        mock_trading_client = Mock()
+        daily_profit_tracker = {"profit": 0}
+
+        with patch.object(trading_agent, "data_client", mock_data_client):
+            with patch.object(trading_agent, "trading_client", mock_trading_client):
+                with patch.object(
+                    trading_agent,
+                    "get_current_central_time",
+                    return_value=trading_agent.datetime(2026, 5, 4, 14, 55, tzinfo=trading_agent.CENTRAL_TZ),
+                ):
+                    with patch("builtins.print"):
+                        with patch(
+                            "scripts.trading_agent.asyncio.sleep",
+                            new=AsyncMock(side_effect=[None, RuntimeError("stop loop")]),
+                        ):
+                            trading_agent.asyncio.run(
+                                trading_agent.sniper_agent(symbol, daily_profit_tracker)
+                            )
+
+        self.assertEqual(mock_trading_client.submit_order.call_count, 1)
+        mock_trading_client.close_all_positions.assert_called_once_with(cancel_orders=True)
+        self.assertEqual(daily_profit_tracker["profit"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

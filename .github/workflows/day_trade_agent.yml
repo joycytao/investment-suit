@@ -61,7 +61,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        symbol: [QQQ, SPY, NVDA]
+        symbol: [SPY]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

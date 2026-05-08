@@ -11,7 +11,7 @@ from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, TimeInForce
-from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
 from dotenv import load_dotenv
 
 
@@ -283,6 +283,15 @@ def submit_market_order(symbol, qty, side):
     )
     trading_client.submit_order(order_data)
 
+def submit_limit_order(symbol, qty, side, price):
+    order_data = LimitOrderRequest(
+        symbol=symbol,
+        qty=qty,
+        side=side,
+        price=price,
+        time_in_force=TimeInForce.DAY,
+    )
+    trading_client.submit_order(order_data)
 
 async def day_trade_momentum_agent(symbol=None, qty=None):
     runtime_symbol = symbol or get_runtime_symbol()
@@ -314,7 +323,8 @@ async def day_trade_momentum_agent(symbol=None, qty=None):
             signal_series = build_momentum_signal_series(frame)
             if bool(signal_series.iloc[-2]): # 05.08 1 -> 2 使用倒數第二根 K 線的信號，避免未完成的當前 K 線帶來的噪音
                 print(f"🎯 {runtime_symbol} Momentum 買入信號觸發！價格: {current_price:.2f}")
-                submit_market_order(symbol=runtime_symbol, qty=order_qty, side=OrderSide.BUY)
+                # submit_market_order(symbol=runtime_symbol, qty=order_qty, side=OrderSide.BUY)
+                submit_limit_order(symbol=runtime_symbol, qty=order_qty, side=OrderSide.BUY, price=current_price)
                 position = PositionState(
                     entry_price=current_price,
                     qty=order_qty,

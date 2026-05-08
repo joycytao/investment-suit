@@ -157,7 +157,7 @@ jobs:
 
   diagnose-failure:
     runs-on: ubuntu-latest
-    needs: [day-trade, day-trade-momentum, day-trade-options]
+    needs: [day-trade, day-trade-momentum]
     if: failure()
     permissions:
       contents: write

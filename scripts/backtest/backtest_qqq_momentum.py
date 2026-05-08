@@ -14,7 +14,7 @@ load_dotenv()
 
 MARKET_TIMEZONE = "America/New_York"
 ENTRY_CUTOFF_TIME = "10:00"
-VWAP_CHASE_THRESHOLD = 1.005
+VWAP_CHASE_THRESHOLD = 1.01
 ATR_STOP_MULTIPLIER = 1.5
 EXIT_REASON_ATR_STOP = "atr_stop"
 EXIT_REASON_EMA_DEAD_CROSS = "ema_dead_cross"
@@ -77,8 +77,8 @@ def add_momentum_indicators(df):
 def build_momentum_signal_series(df):
     cond_ema = (
         (df["ema_9"] > df["ema_21"])
-        & (df["ema_9"] > df["ema_9"].shift(1))
-        & (df["ema_21"] > df["ema_21"].shift(1))
+        # & (df["ema_9"] > df["ema_9"].shift(1))
+        # & (df["ema_21"] > df["ema_21"].shift(1))
     )
     cond_vwap = (
         (df["close"] > df["vwap"])
@@ -91,7 +91,7 @@ def build_momentum_signal_series(df):
 
     adx_df = ta.adx(df['high'], df['low'], df['close'], length=14)
     df['adx'] = adx_df['ADX_14']
-    cond_trend_strong = df['adx'] > 25
+    cond_trend_strong = df['adx'] > 20
 
     if "gamma_high" in df.columns:
         cond_gamma = df["close"] > df["gamma_high"]
@@ -144,8 +144,8 @@ def simulate_momentum_trades(df):
         entry_row = None
 
     if entry_row is not None:
-        last_timestamp = df.index[-1]
-        last_close = float(df.iloc[-1]["close"])
+        last_timestamp = df.index[-2]
+        last_close = float(df.iloc[-2]["close"])
         trades.append(
             {
                 "entry_time": entry_row["entry_time"],

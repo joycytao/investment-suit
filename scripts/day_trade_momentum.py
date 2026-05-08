@@ -25,9 +25,9 @@ LOOKBACK_MINUTES = 240
 DEFAULT_EXECUTION_DURATION_MINUTES = 385
 CENTRAL_TZ = ZoneInfo("America/Chicago")
 ENTRY_CUTOFF_TIME = "09:00"
-VWAP_CHASE_THRESHOLD = 1.005
+VWAP_CHASE_THRESHOLD = 1.01
 ATR_STOP_MULTIPLIER = 1.5
-ADX_THRESHOLD = 25
+ADX_THRESHOLD = 20
 EXIT_REASON_ATR_STOP = "atr_stop"
 EXIT_REASON_EMA_DEAD_CROSS = "ema_dead_cross"
 EXIT_REASON_MARKET_CLOSE = "market_close"
@@ -186,11 +186,12 @@ def add_momentum_indicators(df):
 
 
 def build_momentum_signal_series(df):
-    cond_ema = (
-        (df["ema_9"] > df["ema_21"])
-        & (df["ema_9"] > df["ema_9"].shift(1))
-        & (df["ema_21"] > df["ema_21"].shift(1))
-    )
+    # cond_ema = (
+    #     (df["ema_9"] > df["ema_21"])
+    #     & (df["ema_9"] > df["ema_9"].shift(1))
+    #     & (df["ema_21"] > df["ema_21"].shift(1))
+    # )
+    cond_ema = (df["ema_9"] > df["ema_21"])
     cond_vwap = (
         (df["close"] > df["vwap"])
         & (df["close"] <= df["vwap"] * VWAP_CHASE_THRESHOLD)
@@ -288,17 +289,18 @@ async def day_trade_momentum_agent(symbol=None, qty=None):
             return
 
         frame = fetch_signal_frame(symbol=runtime_symbol, reference_time=current_time)
-        if frame is None or len(frame) < 2:
+        if frame is None or len(frame) < 3: 
             await asyncio.sleep(POLL_INTERVAL_SECONDS)
             continue
 
-        latest = frame.iloc[-1]
-        latest_bar_time = frame.index[-1]
-        current_price = float(latest["close"])
+        latest = frame.iloc[-2] # 05.08 1 -> 2 使用倒數第二根 K 線作為最新數據，避免未完成的當前 K 線帶來的噪音
+        latest_bar_time = frame.index[-2]
+        # current_price = float(latest["close"])
+        current_price = float(frame.iloc[-1]["close"]) # 05.08 2 -> 1 使用當前 K 線的價格作為最新價格，能更即時反映市場變化，但可能會有未完成 K 線的噪音
 
         if position is None:
             signal_series = build_momentum_signal_series(frame)
-            if bool(signal_series.iloc[-1]):
+            if bool(signal_series.iloc[-2]): # 05.08 1 -> 2 使用倒數第二根 K 線的信號，避免未完成的當前 K 線帶來的噪音
                 print(f"🎯 {runtime_symbol} Momentum 買入信號觸發！價格: {current_price:.2f}")
                 submit_market_order(symbol=runtime_symbol, qty=order_qty, side=OrderSide.BUY)
                 position = PositionState(

@@ -74,8 +74,8 @@ async def validate_news_with_ai(symbol):
 
     news_items = getattr(news, "news", [])
     if not news_items:
-        print(f"⚠️ {symbol} 沒有即時新聞，小心是純籌碼炒作。")
-        return False
+        print(f"⚠️ {symbol} 沒有即時新聞，小心是純籌碼炒作，進場小心")
+        return True
 
     for n in news_items:
         print(f"🕒 {n.created_at} | 📰 {n.headline}")

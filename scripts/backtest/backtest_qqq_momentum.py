@@ -14,7 +14,7 @@ load_dotenv()
 
 MARKET_TIMEZONE = "America/New_York"
 ENTRY_CUTOFF_TIME = "10:00"
-VWAP_CHASE_THRESHOLD = 1.01
+VWAP_CHASE_THRESHOLD = 1.005
 ATR_STOP_MULTIPLIER = 1.5
 EXIT_REASON_ATR_STOP = "atr_stop"
 EXIT_REASON_EMA_DEAD_CROSS = "ema_dead_cross"
@@ -77,21 +77,21 @@ def add_momentum_indicators(df):
 def build_momentum_signal_series(df):
     cond_ema = (
         (df["ema_9"] > df["ema_21"])
-        # & (df["ema_9"] > df["ema_9"].shift(1))
-        # & (df["ema_21"] > df["ema_21"].shift(1))
+        & (df["ema_9"] > df["ema_9"].shift(1))
+        & (df["ema_21"] > df["ema_21"].shift(1))
     )
     cond_vwap = (
         (df["close"] > df["vwap"])
         & (df["close"] <= df["vwap"] * VWAP_CHASE_THRESHOLD)
     )
-    cond_orb = (
-        (df.index.strftime("%H:%M") >= ENTRY_CUTOFF_TIME)
-        & (df["close"] > df["orb_high"])
-    )
+    # cond_orb = (
+    #     (df.index.strftime("%H:%M") >= ENTRY_CUTOFF_TIME)
+    #     & (df["close"] > df["orb_high"])
+    # )
 
     adx_df = ta.adx(df['high'], df['low'], df['close'], length=14)
     df['adx'] = adx_df['ADX_14']
-    cond_trend_strong = df['adx'] > 20
+    cond_trend_strong = df['adx'] > 25
 
     if "gamma_high" in df.columns:
         cond_gamma = df["close"] > df["gamma_high"]
@@ -101,7 +101,7 @@ def build_momentum_signal_series(df):
     # cond_time_window = (df.index.strftime("%H:%M") >= "10:00") & \
     #                (df.index.strftime("%H:%M") <= "12:00") # 12點後不再開新倉
 
-    return (cond_ema & cond_vwap & cond_orb & cond_gamma & cond_trend_strong).fillna(False)
+    return (cond_ema & cond_vwap & cond_gamma & cond_trend_strong).fillna(False)
 
 
 def simulate_momentum_trades(df):
@@ -120,11 +120,16 @@ def simulate_momentum_trades(df):
 
         exit_price = None
         exit_reason = None
+        trail_price = float(row["close"]) - (float(row["atr_14"]) * 2.0)
+        if trail_price > entry_row["stop_loss_price"]:
+            current_stop_loss = trail_price
 
-        if float(row["low"]) <= entry_row["stop_loss_price"]:
-            exit_price = entry_row["stop_loss_price"]
+        # if float(row["low"]) <= entry_row["stop_loss_price"]:
+        if float(row["low"]) <= current_stop_loss:
+            exit_price = current_stop_loss
             exit_reason = EXIT_REASON_ATR_STOP
-        elif float(row["ema_9"]) <= float(row["ema_21"]):
+        # elif float(row["ema_9"]) <= float(row["ema_21"]):
+        elif float(row["close"]) < float(row["ema_21"]):
             exit_price = float(row["close"])
             exit_reason = EXIT_REASON_EMA_DEAD_CROSS
 
@@ -144,8 +149,8 @@ def simulate_momentum_trades(df):
         entry_row = None
 
     if entry_row is not None:
-        last_timestamp = df.index[-2]
-        last_close = float(df.iloc[-2]["close"])
+        last_timestamp = df.index[-1]
+        last_close = float(df.iloc[-1]["close"])
         trades.append(
             {
                 "entry_time": entry_row["entry_time"],

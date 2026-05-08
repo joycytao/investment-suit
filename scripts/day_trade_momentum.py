@@ -253,9 +253,21 @@ def fetch_signal_frame(symbol, reference_time=None):
 
 
 def determine_exit_reason(position, current_bar, current_time, market_close_time):
+    
+    #05.08: exit 
+    current_close = float(current_bar["close"])
+
+    # 1. 動態更新停損 (Trailing Stop) - 永遠不往下調
+    # 在你的 PositionState 中增加一個最高價紀錄或直接更新 stop_loss_price
+    new_stop_loss = current_close - (float(current_bar["atr_14"]) * 2.0)
+    if new_stop_loss > position.stop_loss_price:
+        position.stop_loss_price = new_stop_loss # 鎖住利潤
+
     if float(current_bar["low"]) <= position.stop_loss_price:
         return EXIT_REASON_ATR_STOP
-    if float(current_bar["ema_9"]) <= float(current_bar["ema_21"]):
+    # if float(current_bar["ema_9"]) <= float(current_bar["ema_21"]):
+    # 05.08: 更靈敏的 EMA 離場 (例如：收盤價跌破 EMA 21)
+    if current_close < float(current_bar["ema_21"]):
         return EXIT_REASON_EMA_DEAD_CROSS
     if current_time >= market_close_time - timedelta(minutes=5):
         return EXIT_REASON_MARKET_CLOSE

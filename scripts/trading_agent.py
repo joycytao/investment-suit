@@ -258,7 +258,13 @@ async def sniper_agent(symbol, daily_profit_tracker):
             if not in_position:
                 if current_price > last['VWAP'] and current_price > last['EMA20']:
                     print(f"🎯 {symbol} 買入信號觸發！價格: {current_price}")
-                    order_data = LimitOrderRequest(symbol=symbol, qty=qty, side=OrderSide.BUY, price=current_price, time_in_force=TimeInForce.DAY)
+                    order_data = LimitOrderRequest(
+                        symbol=symbol, 
+                        qty=qty, 
+                        side=OrderSide.BUY, 
+                        type=OrderType.LIMIT, 
+                        limit_price=float(current_price), 
+                        time_in_force=TimeInForce.DAY)
                     trading_client.submit_order(order_data)
                     entry_price = current_price
                     in_position = True

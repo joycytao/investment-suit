@@ -289,7 +289,7 @@ def submit_limit_order(symbol, qty, side, price):
         qty=qty,
         side=side,
         type=OrderType.LIMIT,
-        price=price,
+        limit_price=float(price),
         time_in_force=TimeInForce.DAY,
     )
     trading_client.submit_order(order_data)

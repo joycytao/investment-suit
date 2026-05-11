@@ -284,7 +284,7 @@ def submit_market_order(symbol, qty, side):
     trading_client.submit_order(order_data)
 
 def submit_limit_order(symbol, qty, side, price):
-    target_price = float(price)
+    target_price = round(float(price), 2)
     q = int(qty)
     order_data = LimitOrderRequest(
         symbol=symbol,

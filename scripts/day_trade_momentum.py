@@ -10,7 +10,7 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
-from alpaca.trading.enums import OrderSide, TimeInForce
+from alpaca.trading.enums import OrderSide, TimeInForce, OrderType
 from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
 from dotenv import load_dotenv
 
@@ -288,6 +288,7 @@ def submit_limit_order(symbol, qty, side, price):
         symbol=symbol,
         qty=qty,
         side=side,
+        type=OrderType.LIMIT,
         price=price,
         time_in_force=TimeInForce.DAY,
     )

@@ -12,49 +12,49 @@ on:
         default: '315'
 
 jobs:
-  day-trade:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+  # day-trade:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout Code
+  #       uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.13'
 
-      - name: Install Dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r backend/requirements.txt
+  #     - name: Install Dependencies
+  #       run: |
+  #         pip install --upgrade pip
+  #         pip install -r backend/requirements.txt
 
-      - name: Validate Trading Secrets
-        env:
-          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
-          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
-        run: |
-          python - <<'PY'
-          import os
-          import sys
+  #     - name: Validate Trading Secrets
+  #       env:
+  #         ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+  #         ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+  #       run: |
+  #         python - <<'PY'
+  #         import os
+  #         import sys
 
-          required = ["ALPACA_API_KEY", "ALPACA_SECRET_KEY"]
-          missing = [name for name in required if not os.getenv(name, "").strip()]
-          if missing:
-              sys.exit(
-                  "Missing required GitHub Actions secrets: "
-                  + ", ".join(missing)
-              )
+  #         required = ["ALPACA_API_KEY", "ALPACA_SECRET_KEY"]
+  #         missing = [name for name in required if not os.getenv(name, "").strip()]
+  #         if missing:
+  #             sys.exit(
+  #                 "Missing required GitHub Actions secrets: "
+  #                 + ", ".join(missing)
+  #             )
 
-          print("Day-trade secrets are configured.")
-          PY
+  #         print("Day-trade secrets are configured.")
+  #         PY
 
-      - name: Run Sniper Agent
-        env:
-          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
-          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
-          EXECUTION_DURATION_MINUTES: ${{ github.event.inputs.execution_duration_minutes || '315' }}
-          PYTHONUNBUFFERED: '1'
-        run: python -u scripts/qqq_dt_agent.py
+  #     - name: Run Sniper Agent
+  #       env:
+  #         ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+  #         ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+  #         EXECUTION_DURATION_MINUTES: ${{ github.event.inputs.execution_duration_minutes || '315' }}
+  #         PYTHONUNBUFFERED: '1'
+  #       run: python -u scripts/qqq_dt_agent.py
 
   day-trade-momentum:
     runs-on: ubuntu-latest

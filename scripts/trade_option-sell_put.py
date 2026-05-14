@@ -33,6 +33,8 @@ MONITOR_INTERVAL = 600   # 監控任務的循環間隔（秒），預設 10 分�
 stock_client = None
 option_client = None
 trading_client = None
+ALPACA_RETRY_ATTEMPTS = 3
+ALPACA_RETRY_DELAY_SECONDS = 2
 
 
 def _require_credentials():
@@ -62,6 +64,23 @@ def get_trading_client():
         _require_credentials()
         trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
     return trading_client
+
+
+def call_alpaca_with_retries(operation, description):
+    last_error = None
+    for attempt in range(1, ALPACA_RETRY_ATTEMPTS + 1):
+        try:
+            return operation()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as error:
+            last_error = error
+            print(f"{description} 失敗，第 {attempt}/{ALPACA_RETRY_ATTEMPTS} 次: {error}")
+            if attempt < ALPACA_RETRY_ATTEMPTS and ALPACA_RETRY_DELAY_SECONDS > 0:
+                time.sleep(ALPACA_RETRY_DELAY_SECONDS)
+
+    if last_error is not None:
+        raise last_error
+
+    raise RuntimeError(f"{description} 未執行")
 
 def is_earnings_approaching(symbol):
     """ 使用 yfinance 檢查未來 7 天內是否有財報 """
@@ -94,8 +113,9 @@ def run_monitor_and_check_risk():
     """ 監控現有部位並返回當前持倉數 """
     try:
         client = get_trading_client()
-        positions = client.get_all_positions()
-        print(f"當前持倉數: {len(positions)} with account {client.get_account().account_number}")
+        positions = call_alpaca_with_retries(client.get_all_positions, "讀取持倉")
+        account = call_alpaca_with_retries(client.get_account, "讀取帳戶")
+        print(f"當前持倉數: {len(positions)} with account {account.account_number}")
         active_underlyings = set()
         
         for pos in positions:

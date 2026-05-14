@@ -1,6 +1,7 @@
 import os
 import re
 import time
+from io import StringIO
 import pandas as pd
 import pandas_ta as ta
 import requests
@@ -117,7 +118,7 @@ def get_sp100_tickers():
     """ 獲取 S&P 100 成分股清單 """
     try:
         url = 'https://en.wikipedia.org/wiki/S%26P_100'
-        df = pd.read_html(requests.get(url).text)[2]
+        df = pd.read_html(StringIO(requests.get(url).text))[2]
         return df['Symbol'].tolist()
     except:
         return ["MSFT", "AAPL", "GOOGL", "AMZN", "META", "NVDA", "JPM", "XOM", "V", "PG"]

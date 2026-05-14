@@ -152,9 +152,11 @@ def get_sp100_tickers():
     try:
         url = 'https://en.wikipedia.org/wiki/S%26P_100'
         response = requests.get(url, timeout=HTTP_REQUEST_TIMEOUT_SECONDS)
+        print(f"成功獲取 S&P 100 成分股清單 (HTTP {response.status_code})")
         df = pd.read_html(StringIO(response.text))[2]
         return df['Symbol'].tolist()
-    except:
+    except Exception as e:
+        print(f"⚠️ 無法獲取 S&P 100 成分股清單，使用預設清單: {e}")
         return ["MSFT", "AAPL", "GOOGL", "AMZN", "META", "NVDA", "JPM", "XOM", "V", "PG"]
 
 def run_monitor_and_check_risk():

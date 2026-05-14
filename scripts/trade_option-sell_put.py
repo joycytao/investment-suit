@@ -220,6 +220,8 @@ def main():
     # 2. 獲取候選標的
     tickers = get_sp100_tickers()
     for symbol in tickers:
+        print(f"掃描 {symbol}... (當前持倉數: {current_count})")
+        
         if current_count >= MAX_TOTAL_POSITIONS: break
         
         symbol = symbol.replace('.', '-')

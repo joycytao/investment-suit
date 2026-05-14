@@ -222,7 +222,9 @@ def find_and_trade_put(symbol):
         )
         print(f"查詢 {symbol} 的期權鏈，篩選到期日 {min_expiry} ~ {max_expiry} 的 Put 選項...")
         chain = options_client.get_option_chain(req)
+        print(f"找到 {len(chain)} 個符合條件的 Put 選項。")
         contract_symbols = list(chain.keys())
+        print(f"符合條件的合約: {contract_symbols}")
         if not contract_symbols: 
             print(f"⚠️ {symbol} 沒有符合條件的 Put 選項，跳過。")
             return
@@ -237,6 +239,7 @@ def find_and_trade_put(symbol):
             print(f"分析 {name}: Delta={snap.greeks.delta if snap.greeks else 'N/A'}")
             if snap.greeks and snap.greeks.delta is not None:
                 delta = snap.greeks.delta
+                print(f"  Delta={delta:.4f}, 目標 Delta={TARGET_DELTA}, 差距={abs(delta - TARGET_DELTA):.4f}")
                 if -0.20 <= delta <= -0.15:
                     diff = abs(delta - TARGET_DELTA)
                     if diff < smallest_diff:

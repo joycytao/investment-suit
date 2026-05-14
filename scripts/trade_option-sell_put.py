@@ -1,5 +1,6 @@
 import os
 import re
+import signal
 import time
 from io import StringIO
 import pandas as pd
@@ -30,6 +31,8 @@ DTE_RANGE = (30, 45)     # 目標到期日範圍
 TARGET_DELTA = -0.18     # 目標 Delta
 
 MONITOR_INTERVAL = 600   # 監控任務的循環間隔（秒），預設 10 分鐘
+HTTP_REQUEST_TIMEOUT_SECONDS = 10
+YFINANCE_TIMEOUT_SECONDS = 10
 
 stock_client = None
 option_client = None
@@ -96,11 +99,41 @@ def resolve_underlying_symbol(position):
 
     return symbol
 
+
+def _raise_timeout(_signum, _frame):
+    raise TimeoutError()
+
+
+def get_earnings_calendar(symbol, timeout_seconds=YFINANCE_TIMEOUT_SECONDS):
+    alarm_armed = False
+    previous_handler = None
+
+    if hasattr(signal, "SIGALRM"):
+        try:
+            previous_handler = signal.getsignal(signal.SIGALRM)
+            signal.signal(signal.SIGALRM, _raise_timeout)
+            signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
+            alarm_armed = True
+        except ValueError:
+            alarm_armed = False
+
+    try:
+        return yf.Ticker(symbol).calendar
+    except TimeoutError:
+        print(f"⚠️ {symbol} 財報查詢逾時 {timeout_seconds} 秒，略過財報檢查。")
+        return None
+    except Exception as error:
+        print(f"⚠️ {symbol} 財報查詢失敗，略過財報檢查: {error}")
+        return None
+    finally:
+        if alarm_armed:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, previous_handler)
+
 def is_earnings_approaching(symbol):
     """ 使用 yfinance 檢查未來 7 天內是否有財報 """
     try:
-        ticker = yf.Ticker(symbol)
-        calendar = ticker.calendar
+        calendar = get_earnings_calendar(symbol)
         if calendar is not None and 'Earnings Date' in calendar:
             earnings_dates = calendar['Earnings Date']
             if not earnings_dates: return False
@@ -118,7 +151,8 @@ def get_sp100_tickers():
     """ 獲取 S&P 100 成分股清單 """
     try:
         url = 'https://en.wikipedia.org/wiki/S%26P_100'
-        df = pd.read_html(StringIO(requests.get(url).text))[2]
+        response = requests.get(url, timeout=HTTP_REQUEST_TIMEOUT_SECONDS)
+        df = pd.read_html(StringIO(response.text))[2]
         return df['Symbol'].tolist()
     except:
         return ["MSFT", "AAPL", "GOOGL", "AMZN", "META", "NVDA", "JPM", "XOM", "V", "PG"]
@@ -218,7 +252,9 @@ def main():
         return
 
     # 2. 獲取候選標的
+    print("開始抓候選清單...")
     tickers = get_sp100_tickers()
+    print(f"候選清單數量: {len(tickers)}")
     for symbol in tickers:
         print(f"掃描 {symbol}... (當前持倉數: {current_count})")
         

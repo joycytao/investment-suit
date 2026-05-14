@@ -4,12 +4,12 @@ on:
   schedule:
     # 使用 2026 最新支援的 timezone 功能，不再需要手動計算 UTC
     
-    # 1. 持倉監控：美東 10:00，週一至週五
-    - cron: '0 10 * * 1-5'
+    # 1. 持倉監控：美中 9:00，週一至週五
+    - cron: '0 9 * * 1-5'
       timezone: 'America/Chicago'
     
-    # 2. 主掃描與進場：美東 15:10，週二至週四
-    - cron: '10 15 * * 2-4'
+    # 2. 主掃描與進場：美中 14:10，週二至週四
+    - cron: '10 14 * * 2-4'
       timezone: 'America/Chicago'
     
   workflow_dispatch:
@@ -31,16 +31,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install alpaca-py pandas pandas-ta yfinance requests lxml
 
-      - name: Run Monitor Job (10:00 AM New York)
-        if: github.event.schedule == '0 10 * * 1-5'
+      - name: Run Monitor Job (09:00 AM Chicago)
+        if: github.event.schedule == '0 9 * * 1-5'
         env:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           JOB_TYPE: "MONITOR"
         run: python trade_option-sell_put.py
 
-      - name: Run Main Trading Job (03:10 PM New York)
-        if: github.event.schedule == '10 15 * * 2-4' || github.event_name == 'workflow_dispatch'
+      - name: Run Main Trading Job (02:10 PM Chicago)
+        if: github.event.schedule == '10 14 * * 2-4' || github.event_name == 'workflow_dispatch'
         env:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}

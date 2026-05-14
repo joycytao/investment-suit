@@ -4,6 +4,7 @@ on:
   schedule:
     # GitHub Actions cron uses UTC. During Central Daylight Time, 8:30 AM CT = 13:30 UTC.
     - cron: '15 8 * * 1-5'
+      timezone: 'America/Chicago'
   workflow_dispatch:
     inputs:
       execution_duration_minutes:

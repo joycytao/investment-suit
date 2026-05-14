@@ -68,12 +68,3 @@ jobs:
           JOB_TYPE: "MAIN"
           PYTHONUNBUFFERED: '1'
         run: python -u scripts/trade_option-sell_put.py
-
-      - name: Run Early Morning Job (05:30 AM Chicago)
-        if: github.event.schedule == '30 5 * * 1-5'
-        env:
-          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
-          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
-          JOB_TYPE: "MONITOR"
-          PYTHONUNBUFFERED: '1'
-        run: python -u scripts/trade_option-sell_put.py

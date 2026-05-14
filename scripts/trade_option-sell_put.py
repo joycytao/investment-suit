@@ -130,6 +130,22 @@ def get_earnings_calendar(symbol, timeout_seconds=YFINANCE_TIMEOUT_SECONDS):
             signal.setitimer(signal.ITIMER_REAL, 0)
             signal.signal(signal.SIGALRM, previous_handler)
 
+
+def fetch_option_snapshots(options_client, contract_symbols):
+    request = OptionSnapshotRequest(symbol_or_symbols=contract_symbols)
+
+    bulk_snapshot_method = getattr(type(options_client), "get_option_snapshots", None)
+    if callable(bulk_snapshot_method):
+        return call_alpaca_with_retries(
+            lambda: bulk_snapshot_method(options_client, request),
+            "讀取期權快照",
+        )
+
+    return call_alpaca_with_retries(
+        lambda: options_client.get_option_snapshot(request),
+        "讀取期權快照",
+    )
+
 def is_earnings_approaching(symbol):
     """ 使用 yfinance 檢查未來 7 天內是否有財報 """
     try:
@@ -230,8 +246,9 @@ def find_and_trade_put(symbol):
             return
 
         # 獲取快照以分析 Delta
-        snapshots = options_client.get_option_snapshots(OptionSnapshotRequest(symbol_or_symbols=contract_symbols))
-        print(f"獲取 {symbol} 的期權快照以分析 Delta...{snapshots}")
+        print(f"開始獲取 {symbol} 的 {len(contract_symbols)} 個期權快照以分析 Delta...")
+        snapshots = fetch_option_snapshots(options_client, contract_symbols)
+        print(f"成功獲取 {symbol} 的期權快照，共 {len(snapshots)} 筆。")
 
         best_contract = None
         smallest_diff = float('inf')
@@ -253,7 +270,6 @@ def find_and_trade_put(symbol):
                 symbol=best_contract, qty=1, side=OrderSide.SELL, time_in_force=TimeInForce.DAY
             ))
     except Exception as e:
-        current_count -= 1  # 回退計數以允許下一個機會
         print(f"下單失敗 {symbol}: {e}")
 
 def main():

@@ -82,6 +82,19 @@ def call_alpaca_with_retries(operation, description):
 
     raise RuntimeError(f"{description} 未執行")
 
+
+def resolve_underlying_symbol(position):
+    underlying_symbol = getattr(position, "underlying_symbol", None)
+    if underlying_symbol:
+        return underlying_symbol
+
+    symbol = getattr(position, "symbol", "") or ""
+    match = re.match(r"^([A-Z-]+?)(\d{6}[CP]\d{8})$", symbol)
+    if match:
+        return match.group(1)
+
+    return symbol
+
 def is_earnings_approaching(symbol):
     """ 使用 yfinance 檢查未來 7 天內是否有財報 """
     try:
@@ -122,7 +135,7 @@ def run_monitor_and_check_risk():
             if pos.asset_class != "us_option": continue
             
             symbol = pos.symbol
-            underlying = pos.underlying_symbol
+            underlying = resolve_underlying_symbol(pos)
             active_underlyings.add(underlying)
             
             # 1. 50% 止盈檢查
@@ -130,7 +143,7 @@ def run_monitor_and_check_risk():
             if plpc >= PROFIT_TARGET:
                 print(f"【止盈】{symbol} 獲利 {plpc*100:.1f}%，執行平倉。")
                 client.close_position(pos.asset_id)
-                active_underlyings.remove(underlying)
+                active_underlyings.discard(underlying)
                 continue
 
             # 2. 21 DTE 硬性離場檢查
@@ -142,7 +155,7 @@ def run_monitor_and_check_risk():
                 if dte <= EXIT_DTE:
                     print(f"【時間止損】{symbol} 剩餘 {dte} 天，執行離場。")
                     client.close_position(pos.asset_id)
-                    active_underlyings.remove(underlying)
+                    active_underlyings.discard(underlying)
                     
         return len(active_underlyings)
     except Exception as e:

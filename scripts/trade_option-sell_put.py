@@ -205,6 +205,7 @@ def run_monitor_and_check_risk():
 
 def find_and_trade_put(symbol):
     """ 尋找最佳 Delta 的 Put 並下單 """
+    print(f"尋找 {symbol} 的賣出 Put 交易機會...")
     try:
         options_client = get_option_client()
         client = get_trading_client()
@@ -219,9 +220,12 @@ def find_and_trade_put(symbol):
             expiration_date_lte=max_expiry,
             type=ContractType.PUT,
         )
+        print(f"查詢 {symbol} 的期權鏈，篩選到期日 {min_expiry} ~ {max_expiry} 的 Put 選項...")
         chain = options_client.get_option_chain(req)
         contract_symbols = list(chain.keys())
-        if not contract_symbols: return
+        if not contract_symbols: 
+            print(f"⚠️ {symbol} 沒有符合條件的 Put 選項，跳過。")
+            return
 
         # 獲取快照以分析 Delta
         snapshots = options_client.get_option_snapshots(OptionSnapshotRequest(symbol_or_symbols=contract_symbols))
@@ -230,6 +234,7 @@ def find_and_trade_put(symbol):
         smallest_diff = float('inf')
         
         for name, snap in snapshots.items():
+            print(f"分析 {name}: Delta={snap.greeks.delta if snap.greeks else 'N/A'}")
             if snap.greeks and snap.greeks.delta is not None:
                 delta = snap.greeks.delta
                 if -0.20 <= delta <= -0.15:

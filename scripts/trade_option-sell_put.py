@@ -151,7 +151,11 @@ def get_sp100_tickers():
     """ 獲取 S&P 100 成分股清單 """
     try:
         url = 'https://en.wikipedia.org/wiki/S%26P_100'
-        response = requests.get(url, timeout=HTTP_REQUEST_TIMEOUT_SECONDS)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+        }
+
+        response = requests.get(url, timeout=HTTP_REQUEST_TIMEOUT_SECONDS, headers=headers)
         print(f"成功獲取 S&P 100 成分股清單 (HTTP {response.status_code})")
         df = pd.read_html(StringIO(response.text), flavor="lxml")[2]
         return df['Symbol'].tolist()

@@ -10,7 +10,7 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
-from alpaca.trading.enums import OrderSide, TimeInForce, OrderType
+from alpaca.trading.enums import OrderSide, OrderStatus, TimeInForce, OrderType
 from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
 from dotenv import load_dotenv
 
@@ -283,7 +283,7 @@ def submit_market_order(symbol, qty, side):
         side=side,
         time_in_force=TimeInForce.DAY,
     )
-    trading_client.submit_order(order_data)
+    return trading_client.submit_order(order_data)
 
 def submit_limit_order(symbol, qty, side, price):
     target_price = round(float(price), 2)
@@ -296,12 +296,22 @@ def submit_limit_order(symbol, qty, side, price):
         limit_price=target_price,
         time_in_force=TimeInForce.DAY,
     )
-    trading_client.submit_order(order_data)
+    return trading_client.submit_order(order_data)
+
+
+def get_order_status_name(order):
+    status = getattr(order, "status", None)
+    if isinstance(status, OrderStatus):
+        return status.value.lower()
+    if status is None:
+        return ""
+    return str(status).split(".")[-1].lower()
 
 async def day_trade_momentum_agent(symbol=None, qty=None):
     runtime_symbol = symbol or get_runtime_symbol()
     order_qty = qty or get_order_quantity()
     position = None
+    pending_entry_order_id = None
     print(f"📡 啟動 {runtime_symbol} Momentum Breakout 日內監控循環...")
 
     while True:
@@ -324,18 +334,45 @@ async def day_trade_momentum_agent(symbol=None, qty=None):
         # current_price = float(latest["close"])
         current_price = float(frame.iloc[-1]["close"]) # 05.08 2 -> 1 使用當前 K 線的價格作為最新價格，能更即時反映市場變化，但可能會有未完成 K 線的噪音
 
+        if pending_entry_order_id and position is None:
+            entry_order = trading_client.get_order_by_id(pending_entry_order_id)
+            order_status = get_order_status_name(entry_order)
+
+            if order_status == OrderStatus.FILLED.value.lower():
+                filled_qty = int(float(getattr(entry_order, "filled_qty", 0) or order_qty))
+                filled_avg_price = float(getattr(entry_order, "filled_avg_price", 0.0) or current_price)
+                position = PositionState(
+                    entry_price=filled_avg_price,
+                    qty=filled_qty,
+                    entry_time=latest_bar_time,
+                    stop_loss_price=float(latest["stop_loss_price"]),
+                )
+                pending_entry_order_id = None
+                print(f"✅ {runtime_symbol} 進場買單已成交！價格: {filled_avg_price:.2f}")
+            elif order_status in {
+                OrderStatus.CANCELED.value.lower(),
+                OrderStatus.EXPIRED.value.lower(),
+                OrderStatus.REJECTED.value.lower(),
+            }:
+                pending_entry_order_id = None
+                print(f"⚠️ {runtime_symbol} 進場買單未成交，狀態: {order_status}")
+            else:
+                print(f"⏳ {runtime_symbol} 進場買單仍待成交，狀態: {order_status}")
+                await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                continue
+
         if position is None:
             signal_series = build_momentum_signal_series(frame)
             if bool(signal_series.iloc[-2]): # 05.08 1 -> 2 使用倒數第二根 K 線的信號，避免未完成的當前 K 線帶來的噪音
                 print(f"🎯 {runtime_symbol} Momentum 買入信號觸發！價格: {current_price:.2f}")
                 # submit_market_order(symbol=runtime_symbol, qty=order_qty, side=OrderSide.BUY)
-                submit_limit_order(symbol=runtime_symbol, qty=order_qty, side=OrderSide.BUY, price=current_price)
-                position = PositionState(
-                    entry_price=current_price,
+                entry_order = submit_limit_order(
+                    symbol=runtime_symbol,
                     qty=order_qty,
-                    entry_time=latest_bar_time,
-                    stop_loss_price=float(latest["stop_loss_price"]),
+                    side=OrderSide.BUY,
+                    price=current_price,
                 )
+                pending_entry_order_id = entry_order.id
         else:
             exit_reason = determine_exit_reason(
                 position=position,

@@ -95,6 +95,7 @@ def run_monitor_and_check_risk():
     try:
         client = get_trading_client()
         positions = client.get_all_positions()
+        print(f"當前持倉數: {len(positions)} with account {client.get_account().account_number}")
         active_underlyings = set()
         
         for pos in positions:

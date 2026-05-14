@@ -262,14 +262,16 @@ def determine_exit_reason(position, current_bar, current_time, market_close_time
     new_stop_loss = current_close - (float(current_bar["atr_14"]) * 2.0)
     if new_stop_loss > position.stop_loss_price:
         position.stop_loss_price = new_stop_loss # 鎖住利潤
-
     if float(current_bar["low"]) <= position.stop_loss_price:
+        print(f"ATR 停損條件觸發: low {float(current_bar['low']):.2f} <= stop_loss_price {position.stop_loss_price:.2f}")
         return EXIT_REASON_ATR_STOP
     # if float(current_bar["ema_9"]) <= float(current_bar["ema_21"]):
     # 05.08: 更靈敏的 EMA 離場 (例如：收盤價跌破 EMA 21)
     if current_close < float(current_bar["ema_21"]):
+        print(f"EMA 死叉離場條件觸發: close {current_close:.2f} < ema_21 {float(current_bar['ema_21']):.2f}")
         return EXIT_REASON_EMA_DEAD_CROSS
     if current_time >= market_close_time - timedelta(minutes=5):
+        print(f"市場即將收盤: current_time {current_time}, market_close_time {market_close_time}")
         return EXIT_REASON_MARKET_CLOSE
     return None
 

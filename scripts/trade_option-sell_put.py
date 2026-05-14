@@ -231,7 +231,8 @@ def find_and_trade_put(symbol):
 
         # 獲取快照以分析 Delta
         snapshots = options_client.get_option_snapshots(OptionSnapshotRequest(symbol_or_symbols=contract_symbols))
-        
+        print(f"獲取 {symbol} 的期權快照以分析 Delta...{snapshots}")
+
         best_contract = None
         smallest_diff = float('inf')
         

@@ -19,17 +19,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.13'
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install alpaca-py pandas pandas-ta yfinance requests lxml
+          pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Validate Trading Secrets
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+
+          required = ["ALPACA_API_KEY", "ALPACA_SECRET_KEY"]
+          missing = [name for name in required if not os.getenv(name, "").strip()]
+          if missing:
+              sys.exit(
+                  "Missing required GitHub Actions secrets: "
+                  + ", ".join(missing)
+              )
+
+          print("Option-trade secrets are configured.")
+          PY
 
       - name: Run Monitor Job (09:00 AM Chicago)
         if: github.event.schedule == '0 9 * * 1-5'
@@ -37,7 +57,8 @@ jobs:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           JOB_TYPE: "MONITOR"
-        run: python trade_option-sell_put.py
+          PYTHONUNBUFFERED: '1'
+        run: python -u scripts/trade_option-sell_put.py
 
       - name: Run Main Trading Job (02:10 PM Chicago)
         if: github.event.schedule == '10 14 * * 2-4' || github.event_name == 'workflow_dispatch'
@@ -45,7 +66,8 @@ jobs:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           JOB_TYPE: "MAIN"
-        run: python trade_option-sell_put.py
+          PYTHONUNBUFFERED: '1'
+        run: python -u scripts/trade_option-sell_put.py
 
       - name: Run Early Morning Job (05:30 AM Chicago)
         if: github.event.schedule == '30 5 * * 1-5'
@@ -53,4 +75,5 @@ jobs:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           JOB_TYPE: "MONITOR"
-        run: python trade_option-sell_put.py
+          PYTHONUNBUFFERED: '1'
+        run: python -u scripts/trade_option-sell_put.py

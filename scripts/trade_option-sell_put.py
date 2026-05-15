@@ -219,7 +219,7 @@ def run_monitor_and_check_risk():
         print(f"監控錯誤: {e}")
         return 999
 
-def find_and_trade_put(symbol):
+def find_and_trade_put(symbol, current_count):
     """ 尋找最佳 Delta 的 Put 並下單 """
     print(f"尋找 {symbol} 的賣出 Put 交易機會...")
     try:
@@ -236,7 +236,6 @@ def find_and_trade_put(symbol):
             expiration_date_lte=max_expiry,
             type=ContractType.PUT,
         )
-        print(f"查詢 {symbol} 的期權鏈，篩選到期日 {min_expiry} ~ {max_expiry} 的 Put 選項...")
         chain = options_client.get_option_chain(req)
         print(f"找到 {len(chain)} 個符合條件的 Put 選項。")
         contract_symbols = list(chain.keys())
@@ -246,9 +245,7 @@ def find_and_trade_put(symbol):
             return
 
         # 獲取快照以分析 Delta
-        print(f"開始獲取 {symbol} 的 {len(contract_symbols)} 個期權快照以分析 Delta...")
         snapshots = fetch_option_snapshots(options_client, contract_symbols)
-        print(f"成功獲取 {symbol} 的期權快照，共 {len(snapshots)} 筆。")
 
         best_contract = None
         smallest_diff = float('inf')
@@ -266,11 +263,18 @@ def find_and_trade_put(symbol):
         
         if best_contract:
             print(f">>> 執行交易: 賣出 {best_contract} (Delta: {snapshots[best_contract].greeks.delta})")
-            client.submit_order(MarketOrderRequest(
-                symbol=best_contract, qty=1, side=OrderSide.SELL, time_in_force=TimeInForce.DAY
-            ))
+            current_count += 1 # 更新計數避免超買
+
+            try:
+                client.submit_order(MarketOrderRequest(
+                    symbol=best_contract, qty=1, side=OrderSide.SELL, time_in_force=TimeInForce.DAY
+                ))
+            except Exception as e:
+                current_count -= 1 # 回退計數
+                print(f"下單失敗 {best_contract}: {e}")
+
     except Exception as e:
-        print(f"下單失敗 {symbol}: {e}")
+        print(f"尋找和交易 {symbol} 的 Put 選項時發生錯誤: {e}")
 
 def main():
     print(f"--- 啟動交易系統: {datetime.now()} ---")
@@ -306,9 +310,10 @@ def main():
             
             if rsi < RSI_THRESHOLD:
                 print(f"觸發訊號: {symbol} RSI={rsi:.2f}")
-                find_and_trade_put(symbol)
-                current_count += 1 # 更新計數避免超買
+                find_and_trade_put(symbol, current_count)
+
         except Exception as e:
+            print(f"處理 {symbol} 時發生錯誤: {e}")
             continue
 
 if __name__ == "__main__":

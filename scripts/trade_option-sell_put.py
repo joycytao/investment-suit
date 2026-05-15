@@ -132,19 +132,22 @@ def get_earnings_calendar(symbol, timeout_seconds=YFINANCE_TIMEOUT_SECONDS):
 
 
 def fetch_option_snapshots(options_client, contract_symbols):
-    request = OptionSnapshotRequest(symbol_or_symbols=contract_symbols)
 
-    bulk_snapshot_method = getattr(type(options_client), "get_option_snapshots", None)
-    if callable(bulk_snapshot_method):
+    batch_size = 100
+    for i in range(0, len(contract_symbols), batch_size):
+        batch_chunk = contract_symbols[i:i + batch_size]
+        request = OptionSnapshotRequest(symbol_or_symbols=batch_chunk)
+        bulk_snapshot_method = getattr(type(options_client), "get_option_snapshots", None)
+        if callable(bulk_snapshot_method):
+            return call_alpaca_with_retries(
+                lambda: bulk_snapshot_method(options_client, request),
+                "讀取期權快照",
+            )
+
         return call_alpaca_with_retries(
-            lambda: bulk_snapshot_method(options_client, request),
+            lambda: options_client.get_option_snapshot(request),
             "讀取期權快照",
         )
-
-    return call_alpaca_with_retries(
-        lambda: options_client.get_option_snapshot(request),
-        "讀取期權快照",
-    )
 
 def is_earnings_approaching(symbol):
     """ 使用 yfinance 檢查未來 7 天內是否有財報 """
@@ -243,22 +246,8 @@ def find_and_trade_put(symbol, current_count):
             print(f"⚠️ {symbol} 沒有符合條件的 Put 選項，跳過。")
             return
 
-        # --- 新增：期權快照分批處理 ---
-        # Alpaca API 限制每次 Snapshot 請求最多 100 個 symbol
-        option_batch_size = 100
-        snapshots = {}
-        
-        for i in range(0, len(contract_symbols), option_batch_size):
-            batch_chunk = contract_symbols[i:i + option_batch_size]
-            try:
-                # 獲取這一批合約的快照
-                snaps = option_client.get_option_snapshots(
-                    OptionSnapshotRequest(symbol_or_symbols=batch_chunk)
-                )
-                snapshots.update(snaps)
-            except Exception as e:
-                print(f"獲取 {symbol} 期權批次快照失敗: {e}")
-                continue
+        # 獲取快照以分析 Delta
+        snapshots = fetch_option_snapshots(options_client, contract_symbols)
 
         best_contract = None
         smallest_diff = float('inf')

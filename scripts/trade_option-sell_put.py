@@ -255,7 +255,6 @@ def find_and_trade_put(symbol, current_count):
         for name, snap in snapshots.items():
             if snap.greeks and snap.greeks.delta is not None:
                 delta = snap.greeks.delta
-                print(f"  Delta={delta:.4f}, 目標 Delta={TARGET_DELTA}, 差距={abs(delta - TARGET_DELTA):.4f}")
                 if -0.20 <= delta <= -0.15:
                     diff = abs(delta - TARGET_DELTA)
                     if diff < smallest_diff:

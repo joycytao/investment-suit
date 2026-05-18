@@ -312,6 +312,7 @@ async def day_trade_momentum_agent(symbol=None, qty=None):
     order_qty = qty or get_order_quantity()
     position = None
     pending_entry_order_id = None
+    entry_signal_armed = True
     print(f"📡 啟動 {runtime_symbol} Momentum Breakout 日內監控循環...")
 
     while True:
@@ -333,6 +334,10 @@ async def day_trade_momentum_agent(symbol=None, qty=None):
         latest_bar_time = frame.index[-2]
         # current_price = float(latest["close"])
         current_price = float(frame.iloc[-1]["close"]) # 05.08 2 -> 1 使用當前 K 線的價格作為最新價格，能更即時反映市場變化，但可能會有未完成 K 線的噪音
+        signal_series = build_momentum_signal_series(frame)
+        latest_signal = bool(signal_series.iloc[-2])
+        if not latest_signal:
+            entry_signal_armed = True
 
         if pending_entry_order_id and position is None:
             entry_order = trading_client.get_order_by_id(pending_entry_order_id)
@@ -362,8 +367,8 @@ async def day_trade_momentum_agent(symbol=None, qty=None):
                 continue
 
         if position is None:
-            signal_series = build_momentum_signal_series(frame)
-            if bool(signal_series.iloc[-2]): # 05.08 1 -> 2 使用倒數第二根 K 線的信號，避免未完成的當前 K 線帶來的噪音
+            if latest_signal and entry_signal_armed: # 05.08 1 -> 2 使用倒數第二根 K 線的信號，避免未完成的當前 K 線帶來的噪音
+                entry_signal_armed = False
                 print(f"🎯 {runtime_symbol} Momentum 買入信號觸發！價格: {current_price:.2f}")
                 # submit_market_order(symbol=runtime_symbol, qty=order_qty, side=OrderSide.BUY)
                 entry_order = submit_limit_order(

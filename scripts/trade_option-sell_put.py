@@ -14,8 +14,8 @@ from alpaca.data.historical import StockHistoricalDataClient, OptionHistoricalDa
 from alpaca.data.requests import StockBarsRequest, OptionChainRequest, OptionSnapshotRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
-from alpaca.trading.enums import ContractType, OrderSide, TimeInForce
+from alpaca.trading.requests import LimitOrderRequest
+from alpaca.trading.enums import ContractType, OrderSide, OrderType, TimeInForce
 
 
 # --- 全域參數設定 ---
@@ -29,6 +29,7 @@ EXIT_DTE = 21            # 21天硬性離場
 RSI_THRESHOLD = 35       # RSI 超賣門檻
 DTE_RANGE = (30, 45)     # 目標到期日範圍
 TARGET_DELTA = -0.18     # 目標 Delta
+MAX_BID_ASK_SPREAD_RATIO = 0.20  # 最大可接受買賣價差比例
 
 MONITOR_INTERVAL = 600   # 監控任務的循環間隔（秒），預設 10 分鐘
 HTTP_REQUEST_TIMEOUT_SECONDS = 10
@@ -37,6 +38,7 @@ YFINANCE_TIMEOUT_SECONDS = 10
 stock_client = None
 option_client = None
 trading_client = None
+last_known_active_underlyings = set()
 ALPACA_RETRY_ATTEMPTS = 3
 ALPACA_RETRY_DELAY_SECONDS = 2
 
@@ -149,6 +151,28 @@ def fetch_option_snapshots(options_client, contract_symbols):
             "讀取期權快照",
         )
 
+
+def get_short_put_limit_price(snapshot):
+    latest_quote = getattr(snapshot, "latest_quote", None)
+    if latest_quote is None:
+        return None
+
+    bid_price = getattr(latest_quote, "bid_price", None)
+    ask_price = getattr(latest_quote, "ask_price", None)
+    if bid_price is None or ask_price is None:
+        return None
+
+    bid_price = float(bid_price)
+    ask_price = float(ask_price)
+    if bid_price <= 0 or ask_price <= 0 or ask_price < bid_price:
+        return None
+
+    spread_ratio = (ask_price - bid_price) / ask_price
+    if spread_ratio > MAX_BID_ASK_SPREAD_RATIO:
+        return None
+
+    return round((bid_price + ask_price) / 2, 2)
+
 def is_earnings_approaching(symbol):
     """ 使用 yfinance 檢查未來 7 天內是否有財報 """
     try:
@@ -184,11 +208,11 @@ def get_sp100_tickers():
 
 def run_monitor_and_check_risk():
     """ 監控現有部位並返回當前持倉數 """
+    global last_known_active_underlyings
     try:
         client = get_trading_client()
         positions = call_alpaca_with_retries(client.get_all_positions, "讀取持倉")
-        account = call_alpaca_with_retries(client.get_account, "讀取帳戶")
-        print(f"當前持倉數: {len(positions)} with account {account.account_number}")
+        print(f"當前持倉數: {len(positions)}")
         active_underlyings = set()
         
         for pos in positions:
@@ -216,11 +240,15 @@ def run_monitor_and_check_risk():
                     print(f"【時間止損】{symbol} 剩餘 {dte} 天，執行離場。")
                     client.close_position(pos.asset_id)
                     active_underlyings.discard(underlying)
-                    
+
+        last_known_active_underlyings = set(active_underlyings)
         return len(active_underlyings)
     except Exception as e:
         print(f"監控錯誤: {e}")
-        return 999
+        if last_known_active_underlyings:
+            print(f"使用最近一次成功監控結果，持倉數: {len(last_known_active_underlyings)}")
+            return len(last_known_active_underlyings)
+        return MAX_TOTAL_POSITIONS
 
 def find_and_trade_put(symbol, current_count):
     """ 尋找最佳 Delta 的 Put 並下單 """
@@ -250,28 +278,40 @@ def find_and_trade_put(symbol, current_count):
         snapshots = fetch_option_snapshots(options_client, contract_symbols)
 
         best_contract = None
+        best_limit_price = None
         smallest_diff = float('inf')
         
         for name, snap in snapshots.items():
             if snap.greeks and snap.greeks.delta is not None:
                 delta = snap.greeks.delta
                 if -0.20 <= delta <= -0.15:
+                    limit_price = get_short_put_limit_price(snap)
+                    if limit_price is None:
+                        continue
                     diff = abs(delta - TARGET_DELTA)
                     if diff < smallest_diff:
                         smallest_diff = diff
                         best_contract = name
+                        best_limit_price = limit_price
         
-        if best_contract:
-            print(f">>> 執行交易: 賣出 {best_contract} (Delta: {snapshots[best_contract].greeks.delta})")
+        if best_contract and best_limit_price is not None:
+            print(f">>> 執行交易: 賣出 {best_contract} (Delta: {snapshots[best_contract].greeks.delta}, Limit: {best_limit_price:.2f})")
             current_count += 1 # 更新計數避免超買
 
             try:
-                client.submit_order(MarketOrderRequest(
-                    symbol=best_contract, qty=1, side=OrderSide.SELL, time_in_force=TimeInForce.DAY
+                client.submit_order(LimitOrderRequest(
+                    symbol=best_contract,
+                    qty=1,
+                    side=OrderSide.SELL,
+                    type=OrderType.LIMIT,
+                    limit_price=best_limit_price,
+                    time_in_force=TimeInForce.DAY,
                 ))
             except Exception as e:
                 current_count -= 1 # 回退計數
                 print(f"下單失敗 {best_contract}: {e}")
+        else:
+            print(f"⚠️ {symbol} 沒有流動性足夠且價差合理的 Put 合約，跳過。")
 
     except Exception as e:
         print(f"尋找和交易 {symbol} 的 Put 選項時發生錯誤: {e}")
@@ -294,8 +334,6 @@ def main():
         print(f"掃描 {symbol}... (當前持倉數: {current_count})")
         
         if current_count >= MAX_TOTAL_POSITIONS: break
-        
-        symbol = symbol.replace('.', '-')
         
         # 財報避險
         if is_earnings_approaching(symbol): continue

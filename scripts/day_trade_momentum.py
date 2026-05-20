@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pandas_ta as ta
+from alpaca.common.exceptions import APIError
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
@@ -307,6 +308,51 @@ def get_order_status_name(order):
         return ""
     return str(status).split(".")[-1].lower()
 
+
+def get_account_buying_power():
+    try:
+        account = trading_client.get_account()
+    except Exception:
+        return None
+
+    raw_buying_power = getattr(account, "buying_power", None)
+    if raw_buying_power in (None, ""):
+        return None
+
+    try:
+        return float(raw_buying_power)
+    except (TypeError, ValueError):
+        return None
+
+
+def get_affordable_order_quantity(desired_qty, price):
+    try:
+        target_qty = int(desired_qty)
+    except (TypeError, ValueError):
+        return 0
+
+    if target_qty <= 0:
+        return 0
+
+    try:
+        share_price = float(price)
+    except (TypeError, ValueError):
+        return target_qty
+
+    if share_price <= 0:
+        return target_qty
+
+    buying_power = get_account_buying_power()
+    if buying_power is None:
+        return target_qty
+
+    affordable_qty = int(buying_power // share_price)
+    return max(0, min(target_qty, affordable_qty))
+
+
+def is_insufficient_buying_power_error(error):
+    return "insufficient buying power" in str(error).lower()
+
 async def day_trade_momentum_agent(symbol=None, qty=None):
     runtime_symbol = symbol or get_runtime_symbol()
     order_qty = qty or get_order_quantity()
@@ -370,13 +416,28 @@ async def day_trade_momentum_agent(symbol=None, qty=None):
             if latest_signal and entry_signal_armed: # 05.08 1 -> 2 使用倒數第二根 K 線的信號，避免未完成的當前 K 線帶來的噪音
                 entry_signal_armed = False
                 print(f"🎯 {runtime_symbol} Momentum 買入信號觸發！價格: {current_price:.2f}")
+                entry_qty = get_affordable_order_quantity(order_qty, current_price)
+                if entry_qty <= 0:
+                    print(
+                        f"⚠️ {runtime_symbol} 可用 buying power 不足，"
+                        f"略過本次進場。價格: {current_price:.2f}"
+                    )
+                    await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                    continue
                 # submit_market_order(symbol=runtime_symbol, qty=order_qty, side=OrderSide.BUY)
-                entry_order = submit_limit_order(
-                    symbol=runtime_symbol,
-                    qty=order_qty,
-                    side=OrderSide.BUY,
-                    price=current_price,
-                )
+                try:
+                    entry_order = submit_limit_order(
+                        symbol=runtime_symbol,
+                        qty=entry_qty,
+                        side=OrderSide.BUY,
+                        price=current_price,
+                    )
+                except APIError as error:
+                    if is_insufficient_buying_power_error(error):
+                        print(f"⚠️ {runtime_symbol} 下單失敗，buying power 不足。")
+                        await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                        continue
+                    raise
                 pending_entry_order_id = entry_order.id
         else:
             exit_reason = determine_exit_reason(

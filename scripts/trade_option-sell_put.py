@@ -285,8 +285,9 @@ def find_and_trade_put(symbol, current_count, dry_run=False):
             if snap.greeks and snap.greeks.delta is not None:
                 delta = snap.greeks.delta
                 if -0.20 <= delta <= -0.15:
+                    # LIST(dry-run) 模式只篩 Delta；交易模式仍保留流動性與價差過濾。
                     limit_price = get_short_put_limit_price(snap)
-                    if limit_price is None:
+                    if not dry_run and limit_price is None:
                         continue
                     diff = abs(delta - TARGET_DELTA)
                     if diff < smallest_diff:
@@ -313,8 +314,14 @@ def find_and_trade_put(symbol, current_count, dry_run=False):
                 except Exception as e:
                     current_count -= 1 # 回退計數
                     print(f"下單失敗 {best_contract}: {e}")
+        elif best_contract and dry_run:
+            delta_val = snapshots[best_contract].greeks.delta
+            print(f"[LIST] 符合條件: {best_contract} | Delta: {delta_val:.4f} | Limit: N/A")
         else:
-            print(f"⚠️ {symbol} 沒有流動性足夠且價差合理的 Put 合約，跳過。")
+            if dry_run:
+                print(f"[LIST] {symbol} 沒有符合 Delta 範圍的 Put 合約，跳過。")
+            else:
+                print(f"⚠️ {symbol} 沒有流動性足夠且價差合理的 Put 合約，跳過。")
 
     except Exception as e:
         print(f"尋找和交易 {symbol} 的 Put 選項時發生錯誤: {e}")

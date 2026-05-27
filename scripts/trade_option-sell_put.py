@@ -298,20 +298,20 @@ def find_and_trade_put(symbol, current_count):
             print(f">>> 執行交易: 賣出 {best_contract} (Delta: {snapshots[best_contract].greeks.delta}, Limit: {best_limit_price:.2f})")
             current_count += 1 # 更新計數避免超買
             
-            print(f"⚠️ 注意：下單功能已註解，請確認交易邏輯和風控後再啟用。")
-            print(f"⚠️ 模擬下單: 賣出 {best_contract}，數量: 1，限價: {best_limit_price:.2f}")
-            # try:
-            #     client.submit_order(LimitOrderRequest(
-            #         symbol=best_contract,
-            #         qty=1,
-            #         side=OrderSide.SELL,
-            #         type=OrderType.LIMIT,
-            #         limit_price=best_limit_price,
-            #         time_in_force=TimeInForce.DAY,
-            #     ))
-            # except Exception as e:
-            #     current_count -= 1 # 回退計數
-            #     print(f"下單失敗 {best_contract}: {e}")
+            # print(f"⚠️ 注意：下單功能已註解，請確認交易邏輯和風控後再啟用。")
+            # print(f"⚠️ 模擬下單: 賣出 {best_contract}，數量: 1，限價: {best_limit_price:.2f}")
+            try:
+                client.submit_order(LimitOrderRequest(
+                    symbol=best_contract,
+                    qty=1,
+                    side=OrderSide.SELL,
+                    type=OrderType.LIMIT,
+                    limit_price=best_limit_price,
+                    time_in_force=TimeInForce.DAY,
+                ))
+            except Exception as e:
+                current_count -= 1 # 回退計數
+                print(f"下單失敗 {best_contract}: {e}")
         else:
             print(f"⚠️ {symbol} 沒有流動性足夠且價差合理的 Put 合約，跳過。")
 

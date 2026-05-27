@@ -1,16 +1,20 @@
 name: QQQ Day Trade Bot
 
+permissions:
+  actions: read
+  contents: read
+
 on:
   schedule:
-    # GitHub Actions cron uses UTC. During Central Daylight Time, 8:30 AM CT = 13:30 UTC.
-    - cron: '15 8 * * 1-5'
+    # Runs at 8:32 AM America/Chicago on weekdays.
+    - cron: '27 8 * * 1-5'
       timezone: 'America/Chicago'
   workflow_dispatch:
     inputs:
       execution_duration_minutes:
-        description: 'Execution window in minutes after the 8:30 AM Central start time'
+        description: 'Execution window in minutes after the 8:32 AM Central start time'
         required: false
-        default: '315'
+        default: '360'
 
 jobs:
   day-trade-momentum:
@@ -20,20 +24,51 @@ jobs:
       matrix:
         symbol: [SPY, QQQ, NVDA]
     steps:
+      - name: Skip If Another Run Is In Progress
+        id: run-guard
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const currentRunId = context.runId;
+            const workflowId = context.workflow;
+            const branch = context.ref.startsWith('refs/heads/')
+              ? context.ref.slice('refs/heads/'.length)
+              : undefined;
+
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner,
+              repo,
+              workflow_id: workflowId,
+              branch,
+              status: 'in_progress',
+              per_page: 100,
+            });
+
+            const hasOtherActiveRun = runs.some((run) => run.id !== currentRunId);
+            if (hasOtherActiveRun) {
+              core.notice('Another run of this workflow is already in progress. Skipping this run.');
+            }
+            core.setOutput('skip', hasOtherActiveRun ? 'true' : 'false');
+
       - name: Checkout Code
+        if: steps.run-guard.outputs.skip != 'true'
         uses: actions/checkout@v4
 
       - name: Set up Python
+        if: steps.run-guard.outputs.skip != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
 
       - name: Install Dependencies
+        if: steps.run-guard.outputs.skip != 'true'
         run: |
           pip install --upgrade pip
           pip install -r backend/requirements.txt
 
       - name: Validate Trading Secrets
+        if: steps.run-guard.outputs.skip != 'true'
         env:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
@@ -54,6 +89,7 @@ jobs:
           PY
 
       - name: Run Momentum Agent
+        if: steps.run-guard.outputs.skip != 'true'
         env:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}

@@ -250,7 +250,7 @@ def run_monitor_and_check_risk():
             return len(last_known_active_underlyings)
         return MAX_TOTAL_POSITIONS
 
-def find_and_trade_put(symbol, current_count):
+def find_and_trade_put(symbol, current_count, dry_run=False):
     """ 尋找最佳 Delta 的 Put 並下單 """
     print(f"尋找 {symbol} 的賣出 Put 交易機會...")
     try:
@@ -295,36 +295,38 @@ def find_and_trade_put(symbol, current_count):
                         best_limit_price = limit_price
         
         if best_contract and best_limit_price is not None:
-            print(f">>> 執行交易: 賣出 {best_contract} (Delta: {snapshots[best_contract].greeks.delta}, Limit: {best_limit_price:.2f})")
-            current_count += 1 # 更新計數避免超買
-            
-            # print(f"⚠️ 注意：下單功能已註解，請確認交易邏輯和風控後再啟用。")
-            # print(f"⚠️ 模擬下單: 賣出 {best_contract}，數量: 1，限價: {best_limit_price:.2f}")
-            try:
-                client.submit_order(LimitOrderRequest(
-                    symbol=best_contract,
-                    qty=1,
-                    side=OrderSide.SELL,
-                    type=OrderType.LIMIT,
-                    limit_price=best_limit_price,
-                    time_in_force=TimeInForce.DAY,
-                ))
-            except Exception as e:
-                current_count -= 1 # 回退計數
-                print(f"下單失敗 {best_contract}: {e}")
+            delta_val = snapshots[best_contract].greeks.delta
+            if dry_run:
+                print(f"[LIST] 符合條件: {best_contract} | Delta: {delta_val:.4f} | Limit: {best_limit_price:.2f}")
+            else:
+                print(f">>> 執行交易: 賣出 {best_contract} (Delta: {delta_val}, Limit: {best_limit_price:.2f})")
+                current_count += 1 # 更新計數避免超買
+                try:
+                    client.submit_order(LimitOrderRequest(
+                        symbol=best_contract,
+                        qty=1,
+                        side=OrderSide.SELL,
+                        type=OrderType.LIMIT,
+                        limit_price=best_limit_price,
+                        time_in_force=TimeInForce.DAY,
+                    ))
+                except Exception as e:
+                    current_count -= 1 # 回退計數
+                    print(f"下單失敗 {best_contract}: {e}")
         else:
             print(f"⚠️ {symbol} 沒有流動性足夠且價差合理的 Put 合約，跳過。")
 
     except Exception as e:
         print(f"尋找和交易 {symbol} 的 Put 選項時發生錯誤: {e}")
 
-def main():
-    print(f"--- 啟動交易系統: {datetime.now()} ---")
+def main(dry_run=False):
+    mode_label = "[LIST 模式 - 僅列出，不下單]" if dry_run else "[TRADE 模式]"
+    print(f"--- 啟動交易系統 {mode_label}: {datetime.now()} ---")
     stock_data_client = get_stock_client()
     
     # 1. 執行監控並檢查風控
     current_count = run_monitor_and_check_risk()
-    if current_count >= MAX_TOTAL_POSITIONS:
+    if not dry_run and current_count >= MAX_TOTAL_POSITIONS:
         print(f"持倉已滿 ({current_count})，停止掃描新機會。")
         return
 
@@ -335,7 +337,7 @@ def main():
     for symbol in tickers:
         print(f"掃描 {symbol}... (當前持倉數: {current_count})")
         
-        if current_count >= MAX_TOTAL_POSITIONS: break
+        if not dry_run and current_count >= MAX_TOTAL_POSITIONS: break
         
         # 財報避險
         if is_earnings_approaching(symbol): continue
@@ -350,7 +352,7 @@ def main():
             
             if rsi < RSI_THRESHOLD:
                 print(f"觸發訊號: {symbol} RSI={rsi:.2f}")
-                find_and_trade_put(symbol, current_count)
+                find_and_trade_put(symbol, current_count, dry_run=dry_run)
 
         except Exception as e:
             print(f"處理 {symbol} 時發生錯誤: {e}")
@@ -361,11 +363,14 @@ if __name__ == "__main__":
     if job_type == "MONITOR":
         # 監控模式：每 10 分鐘執行一次，持續運行直至 GitHub Actions 強制結束 (預設 360 分鐘或自訂)
         # 為了安全起見，我們讓它運行一小時 (6 次循環) 後正常退出，讓下一個 Cron 接棒
-         for i in range(6):
+        for i in range(6):
             run_monitor_and_check_risk()
             if i < 5:  # 最後一次不需要等待
                 print(f"等待 {MONITOR_INTERVAL} 秒後進行下一次掃描...")
                 time.sleep(MONITOR_INTERVAL)
+    elif job_type == "LIST":
+        print("執行清單模式（僅列出符合條件的 Put，不下單）...")
+        main(dry_run=True)
     else:
         print("執行主要交易任務...")
         main()

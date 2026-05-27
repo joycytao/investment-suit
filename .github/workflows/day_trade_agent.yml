@@ -6,13 +6,13 @@ permissions:
 
 on:
   schedule:
-    # Runs at 8:32 AM America/Chicago on weekdays.
+    # Runs at 8:27 AM America/Chicago on weekdays.
     - cron: '27 8 * * 1-5'
       timezone: 'America/Chicago'
   workflow_dispatch:
     inputs:
       execution_duration_minutes:
-        description: 'Execution window in minutes after the 8:32 AM Central start time'
+        description: 'Execution window in minutes after the 8:27 AM Central start time'
         required: false
         default: '360'
 
@@ -31,21 +31,19 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const currentRunId = context.runId;
-            const workflowId = context.workflow;
             const branch = context.ref.startsWith('refs/heads/')
               ? context.ref.slice('refs/heads/'.length)
               : undefined;
 
-            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+            const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
               owner,
               repo,
-              workflow_id: workflowId,
               branch,
               status: 'in_progress',
               per_page: 100,
             });
 
-            const hasOtherActiveRun = runs.some((run) => run.id !== currentRunId);
+            const hasOtherActiveRun = runs.some((run) => run.name === context.workflow && run.id !== currentRunId);
             if (hasOtherActiveRun) {
               core.notice('Another run of this workflow is already in progress. Skipping this run.');
             }

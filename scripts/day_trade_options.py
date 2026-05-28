@@ -173,7 +173,7 @@ def get_execution_duration_minutes() -> int:
 
 def get_execution_window(reference_time: datetime | None = None) -> tuple[datetime, datetime]:
     current_time = reference_time.astimezone(CENTRAL_TZ) if reference_time else get_current_central_time()
-    market_open = current_time.replace(hour=8, minute=15, second=0, microsecond=0)
+    market_open = current_time.replace(hour=8, minute=30, second=0, microsecond=0)
     market_close = market_open + timedelta(minutes=get_execution_duration_minutes())
     return market_open, market_close
 
@@ -242,6 +242,7 @@ def select_trade_plan_from_chain(
         chain=chain,
         signal_time=current_time,
         option_side=signal_side,
+        mode="intraday",
     )
     if contract is None:
         return None

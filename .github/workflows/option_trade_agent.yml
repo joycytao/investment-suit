@@ -5,11 +5,11 @@ on:
     # 使用 2026 最新支援的 timezone 功能，不再需要手動計算 UTC
     
     # 1. 持倉監控：美中 9:00，週一至週五
-    - cron: '02 09 * * 1-5'
+    - cron: '02 07 * * 1-5'
       timezone: 'America/Chicago'
     
-    # 2. 主掃描與進場：美中 14:10，週二至週四
-    - cron: '12 14 * * 2-4'
+    # 2. 主掃描與進場：美中 12:10，週二至週四
+    - cron: '12 12 * * 2-4' 
       timezone: 'America/Chicago'
     
   workflow_dispatch:

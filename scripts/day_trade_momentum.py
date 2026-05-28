@@ -138,7 +138,7 @@ def get_regular_market_close(reference_time=None):
 
 def get_execution_window(reference_time=None):
     current_time = reference_time.astimezone(CENTRAL_TZ) if reference_time else get_current_central_time()
-    market_open = current_time.replace(hour=8, minute=15, second=0, microsecond=0)
+    market_open = current_time.replace(hour=8, minute=30, second=0, microsecond=0)
     market_close = market_open + timedelta(minutes=get_execution_duration_minutes())
     return market_open, market_close
 

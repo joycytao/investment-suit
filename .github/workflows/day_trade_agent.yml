@@ -7,7 +7,7 @@ permissions:
 on:
   schedule:
     # Runs at 8:27 AM America/Chicago on weekdays.
-    - cron: '27 8 * * 1-5'
+    - cron: '27 6 * * 1-5'
       timezone: 'America/Chicago'
   workflow_dispatch:
     inputs:

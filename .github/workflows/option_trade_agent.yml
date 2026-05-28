@@ -66,8 +66,8 @@ jobs:
           print("Option-trade secrets are configured.")
           PY
 
-      - name: Run Monitor Job (09:00 AM Chicago)
-        if: github.event.schedule == '02 09 * * 1-5' || (github.event_name == 'workflow_dispatch' && inputs.job_type == 'monitor')
+      - name: Run Monitor Job (07:00 AM Chicago)
+        if: github.event.schedule == '02 07 * * 1-5' || (github.event_name == 'workflow_dispatch' && inputs.job_type == 'monitor')
         env:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
@@ -75,8 +75,8 @@ jobs:
           PYTHONUNBUFFERED: '1'
         run: python -u scripts/trade_option-sell_put.py
 
-      - name: Run Main Trading Job (02:10 PM Chicago)
-        if: github.event.schedule == '12 14 * * 2-4' || (github.event_name == 'workflow_dispatch' && inputs.job_type == 'trade')
+      - name: Run Main Trading Job (12:10 PM Chicago)
+        if: github.event.schedule == '12 12 * * 2-4' || (github.event_name == 'workflow_dispatch' && inputs.job_type == 'trade')
         env:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}

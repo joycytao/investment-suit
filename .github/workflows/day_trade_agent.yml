@@ -14,7 +14,7 @@ on:
       execution_duration_minutes:
         description: 'Execution window in minutes after the 8:27 AM Central start time'
         required: false
-        default: '360'
+        default: '390' 
 
 jobs:
   day-trade-momentum:

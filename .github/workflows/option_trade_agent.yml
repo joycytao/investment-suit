@@ -23,6 +23,11 @@ on:
           - monitor
           - trade
           - list
+          - query
+      query_symbol:
+        description: 'Stock symbol for query mode (required when job_type=query)'
+        required: false
+        type: string
 
 jobs:
   trade:
@@ -85,5 +90,23 @@ jobs:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           JOB_TYPE: "LIST"
+          PYTHONUNBUFFERED: '1'
+        run: python -u scripts/trade_option-sell_put.py
+
+      - name: Validate Query Symbol Input
+        if: github.event_name == 'workflow_dispatch' && inputs.job_type == 'query'
+        run: |
+          if [ -z "${{ inputs.query_symbol }}" ]; then
+            echo "query_symbol is required when job_type=query"
+            exit 1
+          fi
+
+      - name: Query Single Symbol Options (dry-run)
+        if: github.event_name == 'workflow_dispatch' && inputs.job_type == 'query'
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          JOB_TYPE: "QUERY"
+          TARGET_SYMBOL: ${{ inputs.query_symbol }}
           PYTHONUNBUFFERED: '1'
         run: python -u scripts/trade_option-sell_put.py

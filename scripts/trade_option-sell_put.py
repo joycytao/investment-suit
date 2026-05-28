@@ -271,7 +271,10 @@ def find_and_trade_put(symbol, current_count, dry_run=False):
         print(f"找到 {len(chain)} 個符合條件的 Put 選項。")
         contract_symbols = list(chain.keys())
         if not contract_symbols: 
-            print(f"⚠️ {symbol} 沒有符合條件的 Put 選項，跳過。")
+            if dry_run:
+                print("沒有符合條件的option")
+            else:
+                print(f"⚠️ {symbol} 沒有符合條件的 Put 選項，跳過。")
             return
 
         # 獲取快照以分析 Delta
@@ -319,7 +322,7 @@ def find_and_trade_put(symbol, current_count, dry_run=False):
             print(f"[LIST] 符合條件: {best_contract} | Delta: {delta_val:.4f} | Limit: N/A")
         else:
             if dry_run:
-                print(f"[LIST] {symbol} 沒有符合 Delta 範圍的 Put 合約，跳過。")
+                print("沒有符合條件的option")
             else:
                 print(f"⚠️ {symbol} 沒有流動性足夠且價差合理的 Put 合約，跳過。")
 
@@ -365,6 +368,33 @@ def main(dry_run=False):
             print(f"處理 {symbol} 時發生錯誤: {e}")
             continue
 
+
+def run_query_symbol(symbol):
+    query_symbol = (symbol or "").strip().upper()
+    if not query_symbol:
+        print("no symbol found")
+        return
+
+    print(f"--- QUERY 模式: {query_symbol} ---")
+
+    # 使用日K資料快速驗證 symbol 是否有效。
+    try:
+        stock_data_client = get_stock_client()
+        bars = stock_data_client.get_stock_bars(StockBarsRequest(
+            symbol_or_symbols=query_symbol,
+            timeframe=TimeFrame.Day,
+            start=datetime.now() - timedelta(days=30),
+        )).df
+    except Exception:
+        print("no symbol found")
+        return
+
+    if bars is None or bars.empty:
+        print("no symbol found")
+        return
+
+    find_and_trade_put(query_symbol, current_count=0, dry_run=True)
+
 if __name__ == "__main__":
     job_type = os.getenv("JOB_TYPE", "MAIN").upper()
     if job_type == "MONITOR":
@@ -378,6 +408,9 @@ if __name__ == "__main__":
     elif job_type == "LIST":
         print("執行清單模式（僅列出符合條件的 Put，不下單）...")
         main(dry_run=True)
+    elif job_type == "QUERY":
+        target_symbol = os.getenv("TARGET_SYMBOL", "")
+        run_query_symbol(target_symbol)
     else:
         print("執行主要交易任務...")
         main()

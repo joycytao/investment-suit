@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        symbol: [SPY, QQQ, NVDA]
+        symbol: [SPY, QQQ, NVDA, PLTR]
     steps:
       - name: Skip If Another Run Is In Progress
         id: run-guard
